@@ -57,3 +57,4 @@ src/
 | 003 | Sign and verify | pending |
 | 004 | Key serialization | pending |
 | 005 | Fingerprint and integration demo | pending |
+| 006 | Coverage audit | pending |
