@@ -5,4 +5,7 @@ export default defineConfig({
     outDir: "dist",
     target: "es2022",
   },
+  server: {
+    host: true,
+  },
 });
