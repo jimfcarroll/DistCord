@@ -41,8 +41,18 @@ Line 139 of `kad-dht.js` reads `this.clientMode = init.clientMode ?? true`, cont
 **Queries fail immediately after connection because routing table is empty.**
 After a browser connects to a DHT server peer, the topology listener needs time to detect the server's `/ipfs/kad/1.0.0` protocol support and add it to the routing table. There is no "DHT ready" event or callback. If you call `provide()` or `findProviders()` immediately after the `peer:connect` event, the routing table is empty and queries time out.
 
-- **Workaround:** Wait ~2 seconds after relay connection before issuing DHT queries. Disable UI controls until the delay has elapsed.
-- **Discovered:** epic-003
+A blind `setTimeout` is unreliable — the required delay depends on how many protocols are registered (each adds to the identify exchange). Adding GossipSub in epic-004 broke a 2-second timer that was working in epic-003.
+
+- **Workaround:** Listen for the `peer:identify` event, verify the peer's protocols include `/ipfs/kad/1.0.0`, then allow a short delay (500ms) for the topology listener to update the routing table. This is event-driven instead of time-based.
+- **Discovered:** epic-003, updated epic-004
+
+### `provide()` and `findProviders()` have no default timeout
+
+**Operations hang forever if the routing table is empty.**
+`contentRouting.provide()` internally calls `findClosestPeers()`. With an empty routing table, the DHT query waits indefinitely for responses from non-existent peers. No timeout, no error — just a permanent hang. Similarly, `findProviders()` can hang if the routing table has no entries.
+
+- **Workaround:** Always pass `{ signal: AbortSignal.timeout(30_000) }` to `provide()` and `findProviders()`.
+- **Discovered:** epic-004
 
 ## `@chainsafe/libp2p-gossipsub`
 

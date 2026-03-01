@@ -5,7 +5,7 @@ import { computeRoomId, announceRoom, discoverRoom } from "./room/index.js";
 import { createRoomMessaging } from "./messaging/index.js";
 import type { RoomMessaging } from "./messaging/index.js";
 import { CID } from "multiformats/cid";
-import type { Libp2p, PeerId } from "@libp2p/interface";
+import type { Libp2p, PeerId, IdentifyResult } from "@libp2p/interface";
 
 const RELAY_INFO_URL = "http://localhost:9002/";
 
@@ -106,16 +106,27 @@ async function main() {
     if (pid === relayPeerId) {
       log("Connected to relay");
       relayStatusEl.textContent = "connected";
-      // Give DHT topology listener time to add relay to routing table
-      setTimeout(() => {
-        createRoomBtn.disabled = false;
-        joinRoomBtn.disabled = false;
-        log("DHT ready");
-      }, 2000);
     } else {
       log(`Peer connected: ${short(pid)}`);
     }
     updatePeersUI();
+  });
+
+  // Wait for identify to confirm relay supports kadDHT before enabling room controls.
+  // The old 2-second setTimeout was a blind guess that broke when GossipSub added
+  // extra protocols to negotiate, making the identify exchange slower.
+  node.addEventListener("peer:identify", (evt: CustomEvent<IdentifyResult>) => {
+    const { peerId, protocols } = evt.detail;
+    if (peerId.toString() !== relayPeerId) return;
+    if (!protocols.includes("/ipfs/kad/1.0.0")) return;
+
+    // kadDHT topology listener processes identify results asynchronously —
+    // give it a moment to update the routing table
+    setTimeout(() => {
+      createRoomBtn.disabled = false;
+      joinRoomBtn.disabled = false;
+      log("DHT ready");
+    }, 500);
   });
 
   node.addEventListener("peer:disconnect", (evt: CustomEvent<PeerId>) => {

@@ -21,7 +21,7 @@ describe("announceRoom", () => {
     await announceRoom(node, cid);
 
     expect(provide).toHaveBeenCalledOnce();
-    expect(provide).toHaveBeenCalledWith(cid);
+    expect(provide).toHaveBeenCalledWith(cid, expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
   it("propagates errors from provide", async () => {
