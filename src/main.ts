@@ -18,6 +18,7 @@ const sendBtn = document.getElementById("send-btn") as HTMLButtonElement;
 
 const connectedPeers = new Set<string>();
 let selectedPeer: string | null = null;
+let relayPeerId: string | null = null;
 
 function log(msg: string, cls: "log-system" | "log-sent" | "log-received" = "log-system") {
   const div = document.createElement("div");
@@ -44,12 +45,7 @@ function updatePeersUI(node: Libp2p) {
     const div = document.createElement("div");
     div.className = "peer";
 
-    const isRelay = node
-      .getConnections()
-      .some(
-        (c) => c.remotePeer.toString() === pid && !c.remoteAddr.toString().includes("/webrtc/"),
-      );
-
+    const isRelay = pid === relayPeerId;
     const label = isRelay ? `${short(pid)} (relay)` : short(pid);
     div.textContent = label;
 
@@ -79,6 +75,10 @@ async function main() {
   const relayAddrs: string[] = relayInfo.addrs;
   log(`Relay: ${relayAddrs[0]}`);
 
+  // Extract relay PeerId from multiaddr (last /p2p/<id> segment)
+  const p2pMatch = relayAddrs[0].match(/\/p2p\/([^/]+)$/);
+  relayPeerId = p2pMatch ? p2pMatch[1] : null;
+
   log("Starting libp2p node...");
   const node = await createBrowserNode(keypair, relayAddrs);
   peerIdEl.textContent = short(node.peerId.toString());
@@ -101,17 +101,23 @@ async function main() {
   node.addEventListener("peer:connect", (evt: CustomEvent<PeerId>) => {
     const pid = evt.detail.toString();
     connectedPeers.add(pid);
-    log(`Connected: ${short(pid)}`);
-    relayStatusEl.textContent = "connected";
+    if (pid === relayPeerId) {
+      log("Connected to relay");
+      relayStatusEl.textContent = "connected";
+    } else {
+      log(`Peer connected: ${short(pid)}`);
+    }
     updatePeersUI(node);
   });
 
   node.addEventListener("peer:disconnect", (evt: CustomEvent<PeerId>) => {
     const pid = evt.detail.toString();
     connectedPeers.delete(pid);
-    log(`Disconnected: ${short(pid)}`);
-    if (connectedPeers.size === 0) {
+    if (pid === relayPeerId) {
+      log("Relay disconnected");
       relayStatusEl.textContent = "disconnected";
+    } else {
+      log(`Peer disconnected: ${short(pid)}`);
     }
     if (selectedPeer === pid) {
       selectedPeer = null;
@@ -144,10 +150,10 @@ async function main() {
   });
 
   // Peer discovery: poll relay info endpoint for other connected peers
-  const relayAddr = relayAddrs[0]; // e.g. /ip4/127.0.0.1/tcp/9001/ws/p2p/<relay-id>
+  const relayAddr = relayAddrs[0];
   const myId = node.peerId.toString();
 
-  log("Polling relay for peers...");
+  log("Waiting for peers...");
   setInterval(async () => {
     try {
       const info = await fetch(RELAY_INFO_URL).then((r) => r.json());
@@ -155,15 +161,12 @@ async function main() {
       for (const pid of peers) {
         if (pid === myId) continue;
         if (connectedPeers.has(pid)) continue;
-        // Dial through the circuit relay
         const circuitAddr = `${relayAddr}/p2p-circuit/p2p/${pid}`;
         log(`Dialing ${short(pid)} via relay...`);
-        node.dial(multiaddr(circuitAddr)).catch(() => {
-          /* dial may fail transiently */
-        });
+        node.dial(multiaddr(circuitAddr)).catch(() => {});
       }
     } catch {
-      /* relay info fetch failed — ignore */
+      /* relay info fetch failed */
     }
   }, 3000);
 }

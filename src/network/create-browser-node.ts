@@ -24,6 +24,11 @@ export async function createBrowserNode(
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     peerDiscovery: bootstrapAddrs?.length ? [bootstrap({ list: bootstrapAddrs })] : [],
+    connectionGater: {
+      // Allow insecure WebSocket (ws://) and private IPs (127.0.0.1) for dev.
+      // The browser default blocks both, which prevents connecting to a local relay.
+      denyDialMultiaddr: () => false,
+    },
     services: {
       identify: identify(),
       identifyPush: identifyPush(),
