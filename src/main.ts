@@ -2,7 +2,7 @@ import { generateKeypair, fingerprint } from "./identity/index.js";
 import { createBrowserNode } from "./network/index.js";
 import type { Libp2p, PeerId } from "@libp2p/interface";
 
-const RELAY_ADDR = "/ip4/127.0.0.1/tcp/9001/ws";
+const RELAY_INFO_URL = "http://localhost:9002/";
 const PROTOCOL = "/decentralized-discord/chat/1.0.0";
 
 // DOM elements
@@ -73,8 +73,13 @@ async function main() {
   const fp = await fingerprint(keypair.publicKey);
   fingerprintEl.textContent = fp.slice(0, 16) + "...";
 
+  log("Fetching relay address...");
+  const relayInfo = await fetch(RELAY_INFO_URL).then((r) => r.json());
+  const relayAddrs: string[] = relayInfo.addrs;
+  log(`Relay: ${relayAddrs[0]}`);
+
   log("Starting libp2p node...");
-  const node = await createBrowserNode(keypair, [RELAY_ADDR]);
+  const node = await createBrowserNode(keypair, relayAddrs);
   peerIdEl.textContent = short(node.peerId.toString());
   peerIdEl.title = node.peerId.toString();
   log(`PeerId: ${node.peerId.toString()}`);

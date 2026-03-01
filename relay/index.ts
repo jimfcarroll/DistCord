@@ -7,9 +7,11 @@ import { identify } from "@libp2p/identify";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { generateKeyPair, privateKeyToProtobuf, privateKeyFromProtobuf } from "@libp2p/crypto/keys";
 import { readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 
 const KEY_PATH = new URL("relay-key.bin", import.meta.url);
 const PORT = Number(process.env.PORT ?? 9001);
+const INFO_PORT = Number(process.env.INFO_PORT ?? 9002);
 
 async function loadOrCreateKey() {
   try {
@@ -46,8 +48,19 @@ async function main() {
     console.log(" ", addr.toString());
   }
 
+  // HTTP info endpoint — browsers fetch this to get the relay's multiaddr
+  const info = createServer((req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ addrs: node.getMultiaddrs().map((a) => a.toString()) }));
+  });
+  info.listen(INFO_PORT, () => {
+    console.log(`Info endpoint: http://0.0.0.0:${INFO_PORT}/`);
+  });
+
   const shutdown = async () => {
     console.log("\nShutting down...");
+    info.close();
     await node.stop();
     process.exit(0);
   };
