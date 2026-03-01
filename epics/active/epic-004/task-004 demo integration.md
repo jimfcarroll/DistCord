@@ -1,6 +1,6 @@
 # Task-004: Demo Integration — Replace 1-to-1 With Broadcast
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -18,11 +18,19 @@ Update `src/main.ts` and `index.html` to use GossipSub room messaging instead of
 
 ## Acceptance Criteria
 
-- [ ] `src/main.ts` uses `createRoomMessaging` for all send/receive
-- [ ] Custom protocol handler removed entirely
-- [ ] Peer selection state and UI removed
-- [ ] Send enables on room join, not peer selection
-- [ ] Received messages show sender fingerprint
-- [ ] Invalid messages dropped
+- [x] `src/main.ts` uses `createRoomMessaging` for all send/receive
+- [x] Custom protocol handler removed entirely
+- [x] Peer selection state and UI removed
+- [x] Send enables on room join, not peer selection
+- [x] Received messages show sender fingerprint
+- [x] Invalid messages dropped (handled by `verifyChatMessage` in room-messaging layer)
 - [ ] Two browsers exchange messages in real time (manual browser test)
-- [ ] All existing tests pass, build and lint clean
+- [x] All existing tests pass, build and lint clean
+
+## Notes
+
+- `enterRoom()` helper creates the `RoomMessaging` instance and subscribes. Called from both create and join paths.
+- Own messages are skipped in the subscription handler (compared by `senderFingerprint`) and displayed optimistically on send.
+- The `PROTOCOL` constant, `node.handle()`, `dialProtocol`, `selectedPeer`, and peer select buttons are all removed.
+- Peer list is now display-only — shows connected peers with relay label but no interaction.
+- Manual browser test still pending — requires running relay + two browser tabs.

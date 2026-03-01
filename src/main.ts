@@ -1,11 +1,13 @@
 import { generateKeypair, fingerprint } from "./identity/index.js";
+import type { IdentityKeypair } from "./identity/index.js";
 import { createBrowserNode } from "./network/index.js";
 import { computeRoomId, announceRoom, discoverRoom } from "./room/index.js";
+import { createRoomMessaging } from "./messaging/index.js";
+import type { RoomMessaging } from "./messaging/index.js";
 import { CID } from "multiformats/cid";
 import type { Libp2p, PeerId } from "@libp2p/interface";
 
 const RELAY_INFO_URL = "http://localhost:9002/";
-const PROTOCOL = "/decentralized-discord/chat/1.0.0";
 
 // DOM elements
 const peerIdEl = document.getElementById("peer-id")!;
@@ -25,8 +27,8 @@ const roomInfoEl = document.getElementById("room-info")!;
 const roomIdEl = document.getElementById("room-id")!;
 
 const connectedPeers = new Set<string>();
-let selectedPeer: string | null = null;
 let relayPeerId: string | null = null;
+let room: RoomMessaging | null = null;
 
 function log(msg: string, cls: "log-system" | "log-sent" | "log-received" = "log-system") {
   const div = document.createElement("div");
@@ -36,15 +38,13 @@ function log(msg: string, cls: "log-system" | "log-sent" | "log-received" = "log
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-function short(peerId: string): string {
-  return peerId.slice(-8);
+function short(s: string): string {
+  return s.slice(-8);
 }
 
-function updatePeersUI(node: Libp2p) {
+function updatePeersUI() {
   if (connectedPeers.size === 0) {
     peersEl.innerHTML = '<span class="label">No peers yet</span>';
-    sendBtn.disabled = true;
-    selectedPeer = null;
     return;
   }
 
@@ -52,22 +52,8 @@ function updatePeersUI(node: Libp2p) {
   for (const pid of connectedPeers) {
     const div = document.createElement("div");
     div.className = "peer";
-
     const isRelay = pid === relayPeerId;
-    const label = isRelay ? `${short(pid)} (relay)` : short(pid);
-    div.textContent = label;
-
-    if (!isRelay) {
-      const btn = document.createElement("button");
-      btn.textContent = selectedPeer === pid ? "selected" : "select";
-      btn.addEventListener("click", () => {
-        selectedPeer = pid;
-        sendBtn.disabled = false;
-        updatePeersUI(node);
-      });
-      div.appendChild(btn);
-    }
-
+    div.textContent = isRelay ? `${short(pid)} (relay)` : short(pid);
     peersEl.appendChild(div);
   }
 }
@@ -76,6 +62,16 @@ function showRoomId(cid: CID) {
   roomIdEl.textContent = cid.toString();
   roomInfoEl.style.display = "block";
   roomControlsEl.style.display = "none";
+}
+
+function enterRoom(node: Libp2p, keypair: IdentityKeypair, cid: CID, myFingerprint: string) {
+  room = createRoomMessaging(node, cid, keypair);
+  room.subscribe((msg) => {
+    // Skip own messages (displayed optimistically on send)
+    if (msg.senderFingerprint === myFingerprint) return;
+    log(`[${msg.senderFingerprint.slice(0, 8)}]: ${msg.body}`, "log-received");
+  });
+  sendBtn.disabled = false;
 }
 
 async function main() {
@@ -99,18 +95,6 @@ async function main() {
   peerIdEl.title = node.peerId.toString();
   log(`PeerId: ${node.peerId.toString()}`);
 
-  // Register chat protocol handler for incoming messages
-  await node.handle(PROTOCOL, (stream, connection) => {
-    const sender = connection.remotePeer.toString();
-    (async () => {
-      for await (const chunk of stream) {
-        const bytes = chunk instanceof Uint8Array ? chunk : chunk.subarray();
-        const msg = new TextDecoder().decode(bytes);
-        log(`${short(sender)}: ${msg}`, "log-received");
-      }
-    })();
-  });
-
   // Disable room controls until relay is connected and DHT routing table populates
   createRoomBtn.disabled = true;
   joinRoomBtn.disabled = true;
@@ -131,7 +115,7 @@ async function main() {
     } else {
       log(`Peer connected: ${short(pid)}`);
     }
-    updatePeersUI(node);
+    updatePeersUI();
   });
 
   node.addEventListener("peer:disconnect", (evt: CustomEvent<PeerId>) => {
@@ -143,11 +127,7 @@ async function main() {
     } else {
       log(`Peer disconnected: ${short(pid)}`);
     }
-    if (selectedPeer === pid) {
-      selectedPeer = null;
-      sendBtn.disabled = true;
-    }
-    updatePeersUI(node);
+    updatePeersUI();
   });
 
   // Create Room
@@ -160,6 +140,8 @@ async function main() {
     showRoomId(cid);
     log(`Created room "${name}"`);
     log(`Room ID: ${cid.toString()}`);
+
+    enterRoom(node, keypair, cid, fp);
 
     try {
       await announceRoom(node, cid);
@@ -185,6 +167,8 @@ async function main() {
     showRoomId(cid);
     log(`Joining room ${cid.toString().slice(-8)}...`);
 
+    enterRoom(node, keypair, cid, fp);
+
     // Also announce ourselves so future peers can find us
     announceRoom(node, cid).catch(() => {});
 
@@ -209,19 +193,11 @@ async function main() {
   sendForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
-    if (!text || !selectedPeer) return;
-
-    const peerId = node.getPeers().find((p) => p.toString() === selectedPeer);
-    if (!peerId) {
-      log(`Peer ${short(selectedPeer)} not found`);
-      return;
-    }
+    if (!text || !room) return;
 
     try {
-      const stream = await node.dialProtocol(peerId, PROTOCOL);
-      stream.send(new TextEncoder().encode(text));
-      await stream.close();
-      log(`You → ${short(selectedPeer)}: ${text}`, "log-sent");
+      await room.publish(text);
+      log(`[${fp.slice(0, 8)}]: ${text}`, "log-sent");
       messageInput.value = "";
     } catch (err) {
       log(`Send failed: ${err}`);

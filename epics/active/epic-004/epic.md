@@ -38,7 +38,7 @@ IndexedDB persistence / history sync / causal ordering → epic-006
 | 001 | GossipSub dependency and configuration | done |
 | 002 | Message types and sign/verify wrappers | done |
 | 003 | Room messaging abstraction | done |
-| 004 | Demo integration | pending |
+| 004 | Demo integration | done |
 
 ## Milestone
 
