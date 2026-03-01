@@ -3,5 +3,6 @@ dist/
 .vite/
 *.tsbuildinfo
 
-/.devcontainer
-/.claude
+/.devcontainer/
+/.claude/
+/coverage/
