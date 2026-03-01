@@ -41,17 +41,17 @@ async function main() {
       identify: identify(),
       ping: ping(),
       dht: kadDHT({
-        // Relay is on a private LAN address — auto-detection won't switch to
-        // server mode, so we force it after startup.
+        clientMode: false,
         peerInfoMapper: passthroughMapper,
       }),
       relay: circuitRelayServer(),
     },
   });
 
-  // Force DHT server mode — relay has a real listening address but it's a
-  // private LAN IP, so the auto-detection won't promote it from client mode.
-  await (node.services.dht as { setMode(mode: string): Promise<void> }).setMode("server");
+  // Verify DHT is in server mode (clientMode: false starts it as server)
+  const dht = node.services.dht as { getMode(): string };
+  console.log("DHT mode:", dht.getMode());
+  console.log("Protocols:", node.getProtocols());
 
   // Track connected peers for discovery
   const connectedPeers = new Set<string>();

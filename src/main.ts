@@ -111,6 +111,10 @@ async function main() {
     })();
   });
 
+  // Disable room controls until relay is connected and DHT routing table populates
+  createRoomBtn.disabled = true;
+  joinRoomBtn.disabled = true;
+
   // Peer events
   node.addEventListener("peer:connect", (evt: CustomEvent<PeerId>) => {
     const pid = evt.detail.toString();
@@ -118,6 +122,12 @@ async function main() {
     if (pid === relayPeerId) {
       log("Connected to relay");
       relayStatusEl.textContent = "connected";
+      // Give DHT topology listener time to add relay to routing table
+      setTimeout(() => {
+        createRoomBtn.disabled = false;
+        joinRoomBtn.disabled = false;
+        log("DHT ready");
+      }, 2000);
     } else {
       log(`Peer connected: ${short(pid)}`);
     }
