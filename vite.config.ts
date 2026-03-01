@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -7,5 +8,8 @@ export default defineConfig({
   },
   server: {
     host: true,
+  },
+  test: {
+    setupFiles: ["./vitest.setup.ts"],
   },
 });
