@@ -1,5 +1,6 @@
 import { generateKeypair, fingerprint } from "./identity/index.js";
 import { createBrowserNode } from "./network/index.js";
+import { multiaddr } from "@multiformats/multiaddr";
 import type { Libp2p, PeerId } from "@libp2p/interface";
 
 const RELAY_INFO_URL = "http://localhost:9002/";
@@ -142,7 +143,29 @@ async function main() {
     }
   });
 
-  log("Waiting for peers...");
+  // Peer discovery: poll relay info endpoint for other connected peers
+  const relayAddr = relayAddrs[0]; // e.g. /ip4/127.0.0.1/tcp/9001/ws/p2p/<relay-id>
+  const myId = node.peerId.toString();
+
+  log("Polling relay for peers...");
+  setInterval(async () => {
+    try {
+      const info = await fetch(RELAY_INFO_URL).then((r) => r.json());
+      const peers: string[] = info.peers ?? [];
+      for (const pid of peers) {
+        if (pid === myId) continue;
+        if (connectedPeers.has(pid)) continue;
+        // Dial through the circuit relay
+        const circuitAddr = `${relayAddr}/p2p-circuit/p2p/${pid}`;
+        log(`Dialing ${short(pid)} via relay...`);
+        node.dial(multiaddr(circuitAddr)).catch(() => {
+          /* dial may fail transiently */
+        });
+      }
+    } catch {
+      /* relay info fetch failed — ignore */
+    }
+  }, 3000);
 }
 
 main().catch((err) => log(`Fatal: ${err}`));

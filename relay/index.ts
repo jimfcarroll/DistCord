@@ -41,6 +41,19 @@ async function main() {
     },
   });
 
+  // Track connected peers for discovery
+  const connectedPeers = new Set<string>();
+  node.addEventListener("peer:connect", (evt) => {
+    const pid = evt.detail.toString();
+    connectedPeers.add(pid);
+    console.log(`Peer connected: ${pid}`);
+  });
+  node.addEventListener("peer:disconnect", (evt) => {
+    const pid = evt.detail.toString();
+    connectedPeers.delete(pid);
+    console.log(`Peer disconnected: ${pid}`);
+  });
+
   console.log("Relay node started");
   console.log("PeerId:", node.peerId.toString());
   console.log("Listening on:");
@@ -48,11 +61,16 @@ async function main() {
     console.log(" ", addr.toString());
   }
 
-  // HTTP info endpoint — browsers fetch this to get the relay's multiaddr
+  // HTTP info endpoint — browsers fetch this to discover the relay and peers
   const info = createServer((req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ addrs: node.getMultiaddrs().map((a) => a.toString()) }));
+    res.end(
+      JSON.stringify({
+        addrs: node.getMultiaddrs().map((a) => a.toString()),
+        peers: [...connectedPeers],
+      }),
+    );
   });
   info.listen(INFO_PORT, () => {
     console.log(`Info endpoint: http://0.0.0.0:${INFO_PORT}/`);
