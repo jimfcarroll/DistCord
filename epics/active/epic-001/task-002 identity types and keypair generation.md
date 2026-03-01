@@ -1,6 +1,6 @@
 # Task-002: Identity Types and Keypair Generation
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -8,18 +8,18 @@ Define the core identity types used across the identity module and implement Ed2
 
 ## Acceptance Criteria
 
-- [ ] Create src/identity/types.ts
-  - [ ] IdentityKeypair — wraps CryptoKey pair (publicKey, privateKey)
-  - [ ] SerializedKeypair — JWK format for both keys (used by task-004)
-  - [ ] Fingerprint — type alias for hex string (used by task-005)
-- [ ] Create src/identity/index.ts (barrel file, will grow as tasks add exports)
-- [ ] Write src/identity/generateKeypair.test.ts (tests first)
-  - [ ] Generates keypair with algorithm name "Ed25519"
-  - [ ] Both keys are extractable (needed for serialization)
-  - [ ] Each call produces a unique keypair
-  - [ ] Public key has "verify" usage, private key has "sign" usage
-- [ ] Create src/identity/generateKeypair.ts — make tests pass
-  - [ ] Uses crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"])
-  - [ ] Returns IdentityKeypair
-- [ ] Export generateKeypair from index.ts
-- [ ] npm run test — all tests pass
+- [x] Create src/identity/types.ts
+  - [x] IdentityKeypair — wraps CryptoKey pair (publicKey, privateKey)
+  - [x] SerializedKeypair — JWK format for both keys (used by task-004)
+  - [x] Fingerprint — type alias for hex string (used by task-005)
+- [x] Create src/identity/index.ts (barrel file, will grow as tasks add exports)
+- [x] Write src/identity/generateKeypair.test.ts (tests first)
+  - [x] Generates keypair with algorithm name "Ed25519"
+  - [x] Both keys are extractable (needed for serialization)
+  - [x] Each call produces a unique keypair
+  - [x] Public key has "verify" usage, private key has "sign" usage
+- [x] Create src/identity/generateKeypair.ts — make tests pass
+  - [x] Uses crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"])
+  - [x] Returns IdentityKeypair
+- [x] Export generateKeypair from index.ts
+- [x] npm run test — all tests pass
