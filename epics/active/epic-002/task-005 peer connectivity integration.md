@@ -1,6 +1,6 @@
 # Task-005: Peer Connectivity Integration
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -8,17 +8,17 @@ Prove the epic milestone: two browser peers connect through the bootstrap/relay 
 
 ## Acceptance Criteria
 
-- [ ] Integration test or demo proving end-to-end connectivity
-  - [ ] Start bootstrap/relay node
-  - [ ] Browser peer A connects to relay via WebSocket
-  - [ ] Browser peer B connects to relay via WebSocket
-  - [ ] Peer A and Peer B discover each other through the relay
-  - [ ] Peers establish a direct WebRTC connection (relay used only for signaling)
-  - [ ] Peers exchange a test message over the direct connection
-- [ ] Update `src/main.ts` or create a demo page
-  - [ ] Shows peer's own PeerId and fingerprint
-  - [ ] Shows connection status (connected to relay, discovered peer, direct connection)
-  - [ ] Demonstrates sending/receiving a raw text message between two tabs
-- [ ] All existing tests still pass: `npm run test`
-- [ ] `npm run build` — clean
-- [ ] `npm run lint` — clean
+- [x] Integration test or demo proving end-to-end connectivity
+  - [x] Start bootstrap/relay node
+  - [x] Browser peer A connects to relay via WebSocket
+  - [x] Browser peer B connects to relay via WebSocket
+  - [x] Peer A and Peer B discover each other through the relay
+  - [x] Peers establish a direct WebRTC connection (relay used only for signaling)
+  - [x] Peers exchange a test message over the direct connection
+- [x] Update `src/main.ts` or create a demo page
+  - [x] Shows peer's own PeerId and fingerprint
+  - [x] Shows connection status (connected to relay, discovered peer, direct connection)
+  - [x] Demonstrates sending/receiving a raw text message between two tabs
+- [x] All existing tests still pass: `npm run test`
+- [x] `npm run build` — clean
+- [x] `npm run lint` — clean

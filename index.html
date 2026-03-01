@@ -3,10 +3,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Decentralized Discord</title>
+    <title>Decentralized Discord — Peer Connectivity Demo</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 1rem; }
+      h1 { font-size: 1.2rem; margin-bottom: 1rem; color: #00d4ff; }
+      h2 { font-size: 1rem; margin-bottom: 0.5rem; color: #7b8cde; }
+      section { margin-bottom: 1rem; padding: 0.75rem; background: #16213e; border-radius: 4px; }
+      #status span { display: block; margin-bottom: 0.25rem; }
+      .label { color: #888; }
+      #peers { min-height: 2rem; }
+      .peer { padding: 0.25rem 0; }
+      .peer button { margin-left: 0.5rem; background: #0f3460; color: #e0e0e0; border: 1px solid #00d4ff; border-radius: 2px; cursor: pointer; padding: 0.1rem 0.5rem; }
+      #log { max-height: 300px; overflow-y: auto; font-size: 0.85rem; }
+      #log div { padding: 0.15rem 0; border-bottom: 1px solid #1a1a2e; }
+      .log-system { color: #7b8cde; }
+      .log-sent { color: #00d4ff; }
+      .log-received { color: #4ecca3; }
+      #send-form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+      #send-form input { flex: 1; background: #0f3460; color: #e0e0e0; border: 1px solid #333; border-radius: 2px; padding: 0.3rem 0.5rem; font-family: monospace; }
+      #send-form button { background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 2px; cursor: pointer; padding: 0.3rem 0.75rem; font-family: monospace; }
+      #send-form button:disabled { opacity: 0.4; cursor: default; }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <h1>Peer Connectivity Demo</h1>
+
+    <section id="status">
+      <h2>Identity</h2>
+      <span><span class="label">PeerId:</span> <span id="peer-id">generating...</span></span>
+      <span><span class="label">Fingerprint:</span> <span id="fingerprint">—</span></span>
+      <span><span class="label">Relay:</span> <span id="relay-status">disconnected</span></span>
+    </section>
+
+    <section>
+      <h2>Connected Peers</h2>
+      <div id="peers"><span class="label">No peers yet</span></div>
+    </section>
+
+    <section>
+      <h2>Messages</h2>
+      <div id="log"></div>
+      <form id="send-form">
+        <input id="message-input" type="text" placeholder="Type a message..." autocomplete="off" />
+        <button type="submit" id="send-btn" disabled>Send</button>
+      </form>
+    </section>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
