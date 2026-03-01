@@ -1,6 +1,6 @@
 # Task-002: Message Types and Sign/Verify Wrappers
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -23,11 +23,11 @@ The signature covers `JSON.stringify({ type, senderPublicKey, senderFingerprint,
 
 ## Acceptance Criteria
 
-- [ ] New module `src/messaging/` with barrel export `src/messaging/index.ts`
-- [ ] Types in `src/messaging/types.ts`: `ChatMessage`, `MessageVerificationResult`
-- [ ] `createChatMessage` in `src/messaging/create-chat-message.ts`
-- [ ] `verifyChatMessage` in `src/messaging/verify-chat-message.ts`
-- [ ] `serializeChatMessage` and `deserializeChatMessage` in `src/messaging/serialize.ts`
-- [ ] Tests: valid message creation, fingerprint matches, signature verification, tamper detection (body, signature, key), serialize round-trip, garbage input rejection
-- [ ] 85%+ coverage on new code
-- [ ] All existing tests pass, build and lint clean
+- [x] New module `src/messaging/` with barrel export `src/messaging/index.ts`
+- [x] Types in `src/messaging/types.ts`: `ChatMessage`, `MessageVerificationResult`
+- [x] `createChatMessage` in `src/messaging/create-chat-message.ts`
+- [x] `verifyChatMessage` in `src/messaging/verify-chat-message.ts`
+- [x] `serializeChatMessage` and `deserializeChatMessage` in `src/messaging/serialize.ts`
+- [x] Tests: valid message creation, fingerprint matches, signature verification, tamper detection (body, signature, key), serialize round-trip, garbage input rejection
+- [x] 85%+ coverage on new code (89.1%)
+- [x] All existing tests pass, build and lint clean
