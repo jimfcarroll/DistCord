@@ -34,7 +34,21 @@ IndexedDB persistence / history sync → epic-006
 | 001 | kad-dht dependency and configuration | done |
 | 002 | Room ID computation | done |
 | 003 | DHT provider announce and discovery | done |
-| 004 | Room discovery integration demo | in progress |
+| 004 | Room discovery integration demo | done |
+
+## Notes
+
+### kadDHT `clientMode` default is `true`, not `false`
+
+The `@libp2p/kad-dht` source (line 139 of `kad-dht.js`) reads `this.clientMode = init.clientMode ?? true`, contradicting its JSDoc which says `@default false`. This meant both the relay and browser started in client mode. Client mode does not register the `/ipfs/kad/1.0.0` protocol handler, so the browser's topology listener never detected a DHT-capable peer, routing tables stayed empty, and all `provide()` / `findProviders()` calls timed out with `TimeoutError: signal timed out` — no indication of the root cause.
+
+**Fix:** Explicitly set `clientMode: false` on the relay's kadDHT config. The browser correctly stays in client mode (the default happens to be correct for browsers, just wrong for servers).
+
+### DHT routing table needs time after connection
+
+After the browser connects to the relay via WebSocket, the DHT topology listener needs time to detect the relay's `/ipfs/kad/1.0.0` protocol and add it to the routing table. There is no "DHT ready" event. If you call `provide()` or `findProviders()` immediately after connecting, the routing table is empty and queries time out.
+
+**Fix:** Disable room create/join buttons until the relay connects, then wait 2 seconds for the routing table to populate before enabling them.
 
 ## Milestone
 
