@@ -1,6 +1,6 @@
 # Task-002: Identity Bridge — WebCrypto to libp2p
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -10,15 +10,15 @@ The bridge path: export keypair to JWK → extract `d` field (32-byte Ed25519 se
 
 ## Acceptance Criteria
 
-- [ ] Write `src/network/identity-bridge.test.ts` (tests first)
-  - [ ] Same keypair always produces the same PeerId (deterministic)
-  - [ ] Fingerprint derived from PeerId's public key bytes matches our `fingerprint()` output — proves both representations hold the same key
-  - [ ] Bridge works after JWK round-trip: `generateKeypair → export → import → bridge` produces same PeerId as `generateKeypair → bridge`
-  - [ ] Two different keypairs produce different PeerIds
-- [ ] Create `src/network/identity-bridge.ts`
-  - [ ] `keypairToLibp2pKey(keypair: IdentityKeypair)` → returns libp2p `PrivateKey`
-  - [ ] `keypairToPeerId(keypair: IdentityKeypair)` → returns libp2p `PeerId` (convenience wrapper)
-  - [ ] Uses `@libp2p/crypto` `generateKeyPairFromSeed` and `@libp2p/peer-id` `peerIdFromPrivateKey`
-- [ ] Export bridge functions from `src/network/index.ts`
-- [ ] `npm run test` — all tests pass (new + existing)
-- [ ] `npm run lint` — clean
+- [x] Write `src/network/identity-bridge.test.ts` (tests first)
+  - [x] Same keypair always produces the same PeerId (deterministic)
+  - [x] Fingerprint derived from PeerId's public key bytes matches our `fingerprint()` output — proves both representations hold the same key
+  - [x] Bridge works after JWK round-trip: `generateKeypair → export → import → bridge` produces same PeerId as `generateKeypair → bridge`
+  - [x] Two different keypairs produce different PeerIds
+- [x] Create `src/network/identity-bridge.ts`
+  - [x] `keypairToLibp2pKey(keypair: IdentityKeypair)` → returns libp2p `PrivateKey`
+  - [x] `keypairToPeerId(keypair: IdentityKeypair)` → returns libp2p `PeerId` (convenience wrapper)
+  - [x] Uses `@libp2p/crypto` `generateKeyPairFromSeed` and `@libp2p/peer-id` `peerIdFromPrivateKey`
+- [x] Export bridge functions from `src/network/index.ts`
+- [x] `npm run test` — all tests pass (24/24)
+- [x] `npm run lint` — clean

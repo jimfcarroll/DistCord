@@ -1,1 +1,1 @@
-// Barrel file — exports added as tasks complete
+export { keypairToLibp2pKey, keypairToPeerId } from "./identity-bridge.js";
