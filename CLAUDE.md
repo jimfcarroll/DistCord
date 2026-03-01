@@ -37,6 +37,10 @@ Style decisions are pragmatic, not philosophical. Follow what's here. If somethi
 - `npm run test` — run tests
 - `npm run lint` — lint and format check
 
+## Working Agreement
+
+All work follows the process in `WORKING_AGREEMENT.md`. Read it before starting any task.
+
 ## Hard Technical Constraints
 
 - Browsers cannot bind to ports or accept inbound connections. All P2P connectivity goes through WebRTC.
