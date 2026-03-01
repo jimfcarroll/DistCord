@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Decentralized Discord — Peer Connectivity Demo</title>
+    <title>Decentralized Discord — Room Discovery Demo</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 1rem; }
@@ -12,6 +12,12 @@
       section { margin-bottom: 1rem; padding: 0.75rem; background: #16213e; border-radius: 4px; }
       #status span { display: block; margin-bottom: 0.25rem; }
       .label { color: #888; }
+      .row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; }
+      .row input { flex: 1; background: #0f3460; color: #e0e0e0; border: 1px solid #333; border-radius: 2px; padding: 0.3rem 0.5rem; font-family: monospace; }
+      .row button, #send-form button { background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 2px; cursor: pointer; padding: 0.3rem 0.75rem; font-family: monospace; }
+      .row button:disabled, #send-form button:disabled { opacity: 0.4; cursor: default; }
+      .separator { color: #555; text-align: center; margin: 0.25rem 0; }
+      #room-info { margin-top: 0.5rem; word-break: break-all; font-size: 0.85rem; }
       #peers { min-height: 2rem; }
       .peer { padding: 0.25rem 0; }
       .peer button { margin-left: 0.5rem; background: #0f3460; color: #e0e0e0; border: 1px solid #00d4ff; border-radius: 2px; cursor: pointer; padding: 0.1rem 0.5rem; }
@@ -22,18 +28,34 @@
       .log-received { color: #4ecca3; }
       #send-form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
       #send-form input { flex: 1; background: #0f3460; color: #e0e0e0; border: 1px solid #333; border-radius: 2px; padding: 0.3rem 0.5rem; font-family: monospace; }
-      #send-form button { background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 2px; cursor: pointer; padding: 0.3rem 0.75rem; font-family: monospace; }
-      #send-form button:disabled { opacity: 0.4; cursor: default; }
     </style>
   </head>
   <body>
-    <h1>Peer Connectivity Demo</h1>
+    <h1>Room Discovery Demo</h1>
 
     <section id="status">
       <h2>Identity</h2>
       <span><span class="label">PeerId:</span> <span id="peer-id">generating...</span></span>
       <span><span class="label">Fingerprint:</span> <span id="fingerprint">—</span></span>
       <span><span class="label">Relay:</span> <span id="relay-status">disconnected</span></span>
+    </section>
+
+    <section>
+      <h2>Room</h2>
+      <div id="room-controls">
+        <div class="row">
+          <input id="room-name" type="text" placeholder="Room name..." autocomplete="off" />
+          <button id="create-room-btn">Create</button>
+        </div>
+        <div class="separator">— or —</div>
+        <div class="row">
+          <input id="room-id-input" type="text" placeholder="Paste room ID to join..." autocomplete="off" />
+          <button id="join-room-btn">Join</button>
+        </div>
+      </div>
+      <div id="room-info" style="display: none;">
+        <span class="label">Room ID:</span> <span id="room-id"></span>
+      </div>
     </section>
 
     <section>

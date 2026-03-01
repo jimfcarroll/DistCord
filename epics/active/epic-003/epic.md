@@ -34,7 +34,7 @@ IndexedDB persistence / history sync → epic-006
 | 001 | kad-dht dependency and configuration | done |
 | 002 | Room ID computation | done |
 | 003 | DHT provider announce and discovery | done |
-| 004 | Room discovery integration demo | pending |
+| 004 | Room discovery integration demo | in progress |
 
 ## Milestone
 

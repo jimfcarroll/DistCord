@@ -1,6 +1,7 @@
 import { generateKeypair, fingerprint } from "./identity/index.js";
 import { createBrowserNode } from "./network/index.js";
-import { multiaddr } from "@multiformats/multiaddr";
+import { computeRoomId, announceRoom, discoverRoom } from "./room/index.js";
+import { CID } from "multiformats/cid";
 import type { Libp2p, PeerId } from "@libp2p/interface";
 
 const RELAY_INFO_URL = "http://localhost:9002/";
@@ -15,6 +16,13 @@ const logEl = document.getElementById("log")!;
 const sendForm = document.getElementById("send-form") as HTMLFormElement;
 const messageInput = document.getElementById("message-input") as HTMLInputElement;
 const sendBtn = document.getElementById("send-btn") as HTMLButtonElement;
+const roomNameInput = document.getElementById("room-name") as HTMLInputElement;
+const createRoomBtn = document.getElementById("create-room-btn") as HTMLButtonElement;
+const roomIdInput = document.getElementById("room-id-input") as HTMLInputElement;
+const joinRoomBtn = document.getElementById("join-room-btn") as HTMLButtonElement;
+const roomControlsEl = document.getElementById("room-controls")!;
+const roomInfoEl = document.getElementById("room-info")!;
+const roomIdEl = document.getElementById("room-id")!;
 
 const connectedPeers = new Set<string>();
 let selectedPeer: string | null = null;
@@ -62,6 +70,12 @@ function updatePeersUI(node: Libp2p) {
 
     peersEl.appendChild(div);
   }
+}
+
+function showRoomId(cid: CID) {
+  roomIdEl.textContent = cid.toString();
+  roomInfoEl.style.display = "block";
+  roomControlsEl.style.display = "none";
 }
 
 async function main() {
@@ -126,6 +140,61 @@ async function main() {
     updatePeersUI(node);
   });
 
+  // Create Room
+  createRoomBtn.addEventListener("click", async () => {
+    const name = roomNameInput.value.trim();
+    if (!name) return;
+
+    const nonce = crypto.randomUUID();
+    const cid = await computeRoomId(keypair.publicKey, name, nonce);
+    showRoomId(cid);
+    log(`Created room "${name}"`);
+    log(`Room ID: ${cid.toString()}`);
+
+    try {
+      await announceRoom(node, cid);
+      log("Announced on DHT — waiting for peers to join");
+    } catch (err) {
+      log(`DHT announce failed: ${err}`);
+    }
+  });
+
+  // Join Room
+  joinRoomBtn.addEventListener("click", async () => {
+    const cidStr = roomIdInput.value.trim();
+    if (!cidStr) return;
+
+    let cid: CID;
+    try {
+      cid = CID.parse(cidStr);
+    } catch {
+      log("Invalid room ID");
+      return;
+    }
+
+    showRoomId(cid);
+    log(`Joining room ${cid.toString().slice(-8)}...`);
+
+    // Also announce ourselves so future peers can find us
+    announceRoom(node, cid).catch(() => {});
+
+    try {
+      let found = 0;
+      for await (const provider of discoverRoom(node, cid)) {
+        const pid = provider.id.toString();
+        if (pid === node.peerId.toString()) continue;
+        found++;
+        log(`Found peer: ${short(pid)}`);
+        node.dial(provider.id).catch(() => {});
+      }
+      if (found === 0) {
+        log("No peers found — room may be empty or DHT not yet populated");
+      }
+    } catch (err) {
+      log(`DHT discovery failed: ${err}`);
+    }
+  });
+
   // Send message
   sendForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -134,7 +203,7 @@ async function main() {
 
     const peerId = node.getPeers().find((p) => p.toString() === selectedPeer);
     if (!peerId) {
-      log(`Peer ${short(selectedPeer)} not found`, "log-system");
+      log(`Peer ${short(selectedPeer)} not found`);
       return;
     }
 
@@ -145,30 +214,9 @@ async function main() {
       log(`You → ${short(selectedPeer)}: ${text}`, "log-sent");
       messageInput.value = "";
     } catch (err) {
-      log(`Send failed: ${err}`, "log-system");
+      log(`Send failed: ${err}`);
     }
   });
-
-  // Peer discovery: poll relay info endpoint for other connected peers
-  const relayAddr = relayAddrs[0];
-  const myId = node.peerId.toString();
-
-  log("Waiting for peers...");
-  setInterval(async () => {
-    try {
-      const info = await fetch(RELAY_INFO_URL).then((r) => r.json());
-      const peers: string[] = info.peers ?? [];
-      for (const pid of peers) {
-        if (pid === myId) continue;
-        if (connectedPeers.has(pid)) continue;
-        const circuitAddr = `${relayAddr}/p2p-circuit/p2p/${pid}`;
-        log(`Dialing ${short(pid)} via relay...`);
-        node.dial(multiaddr(circuitAddr)).catch(() => {});
-      }
-    } catch {
-      /* relay info fetch failed */
-    }
-  }, 3000);
 }
 
 main().catch((err) => log(`Fatal: ${err}`));
