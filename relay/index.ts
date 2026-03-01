@@ -6,10 +6,18 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { identify } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
 import { kadDHT, passthroughMapper } from "@libp2p/kad-dht";
+import { gossipsub } from "@chainsafe/libp2p-gossipsub";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { generateKeyPair, privateKeyToProtobuf, privateKeyFromProtobuf } from "@libp2p/crypto/keys";
 import { readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+
+// gossipsub 14.x bundles @libp2p/interface@2.x; libp2p 3.x uses @3.x.
+// Runtime compatible, but the types diverge. Cast through unknown.
+const pubsub = gossipsub({
+  globalSignaturePolicy: "StrictNoSign",
+  allowPublishToZeroTopicPeers: true,
+}) as unknown as ReturnType<typeof identify>;
 
 const KEY_PATH = new URL("relay-key.bin", import.meta.url);
 const PORT = Number(process.env.PORT ?? 9001);
@@ -44,6 +52,7 @@ async function main() {
         clientMode: false,
         peerInfoMapper: passthroughMapper,
       }),
+      pubsub,
       relay: circuitRelayServer(),
     },
   });

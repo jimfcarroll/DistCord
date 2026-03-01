@@ -46,6 +46,13 @@ describe("createBrowserNode", () => {
     expect(node.services.dht).toBeDefined();
   });
 
+  it("has pubsub service configured", async () => {
+    const keypair = await generateKeypair();
+    node = await createBrowserNode(keypair);
+
+    expect(node.services.pubsub).toBeDefined();
+  });
+
   it("works without bootstrap addresses", async () => {
     const keypair = await generateKeypair();
     node = await createBrowserNode(keypair);

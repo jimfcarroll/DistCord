@@ -11,6 +11,7 @@
     "relay": "tsx relay/index.ts"
   },
   "dependencies": {
+    "@chainsafe/libp2p-gossipsub": "*",
     "@chainsafe/libp2p-noise": "*",
     "@chainsafe/libp2p-yamux": "*",
     "@libp2p/bootstrap": "*",

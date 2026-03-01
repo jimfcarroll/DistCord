@@ -43,3 +43,13 @@ After a browser connects to a DHT server peer, the topology listener needs time 
 
 - **Workaround:** Wait ~2 seconds after relay connection before issuing DHT queries. Disable UI controls until the delay has elapsed.
 - **Discovered:** epic-003
+
+## `@chainsafe/libp2p-gossipsub`
+
+### Version mismatch with `@libp2p/interface`
+
+**TypeScript type errors when used with `libp2p@3.x`.**
+`@chainsafe/libp2p-gossipsub@14.x` depends on `@libp2p/interface@^2.0.0`, but `libp2p@3.x` depends on `@libp2p/interface@^3.0.0`. GossipSub bundles its own copy of the older interface in its `node_modules`, causing TypeScript to see incompatible `Peer`, `Address`, and `Multiaddr` types between the two copies. The runtime behavior is fine — only the types diverge.
+
+- **Workaround:** Cast the gossipsub factory result through `unknown` to the expected service type: `gossipsub({...}) as unknown as ReturnType<typeof identify>`.
+- **Discovered:** epic-004
