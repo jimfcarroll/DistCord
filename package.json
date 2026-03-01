@@ -9,6 +9,20 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src/ && prettier --check src/"
   },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "*",
+    "@chainsafe/libp2p-yamux": "*",
+    "@libp2p/bootstrap": "*",
+    "@libp2p/circuit-relay-v2": "*",
+    "@libp2p/crypto": "*",
+    "@libp2p/identify": "*",
+    "@libp2p/peer-id": "*",
+    "@libp2p/ping": "*",
+    "@libp2p/webrtc": "*",
+    "@libp2p/websockets": "*",
+    "@multiformats/multiaddr": "*",
+    "libp2p": "*"
+  },
   "devDependencies": {
     "@vitest/coverage-v8": "~3.0",
     "eslint": "~9.39",
