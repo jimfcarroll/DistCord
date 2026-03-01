@@ -1,0 +1,21 @@
+{
+  "name": "decentralized-discord",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src/ && prettier --check src/"
+  },
+  "devDependencies": {
+    "typescript": "~5.7",
+    "vite": "~6.4",
+    "vitest": "~3.0",
+    "eslint": "~9.39",
+    "typescript-eslint": "~8.56",
+    "eslint-config-prettier": "~10.0",
+    "prettier": "~3.0"
+  }
+}
