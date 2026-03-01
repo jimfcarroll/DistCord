@@ -6,3 +6,4 @@ dist/
 /.devcontainer/
 /.claude/
 /coverage/
+relay-key.bin

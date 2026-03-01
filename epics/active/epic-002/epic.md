@@ -55,5 +55,5 @@ Two browsers connect through the bootstrap/relay node, discover each other, esta
 | 001 | Dependencies and project structure | done |
 | 002 | Identity bridge — WebCrypto to libp2p | done |
 | 003 | Browser libp2p node factory | done |
-| 004 | Bootstrap/relay node | pending |
+| 004 | Bootstrap/relay node | done |
 | 005 | Peer connectivity integration | pending |
