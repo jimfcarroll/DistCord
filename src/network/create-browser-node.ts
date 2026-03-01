@@ -6,6 +6,7 @@ import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { identify, identifyPush } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
+import { kadDHT, passthroughMapper } from "@libp2p/kad-dht";
 import { bootstrap } from "@libp2p/bootstrap";
 import type { Libp2p } from "@libp2p/interface";
 import type { IdentityKeypair } from "../identity/types.js";
@@ -33,6 +34,9 @@ export async function createBrowserNode(
       identify: identify(),
       identifyPush: identifyPush(),
       ping: ping(),
+      dht: kadDHT({
+        peerInfoMapper: passthroughMapper,
+      }),
     },
   });
 }

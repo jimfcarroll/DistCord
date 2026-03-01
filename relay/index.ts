@@ -4,6 +4,8 @@ import { webSockets } from "@libp2p/websockets";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { identify } from "@libp2p/identify";
+import { ping } from "@libp2p/ping";
+import { kadDHT, passthroughMapper } from "@libp2p/kad-dht";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { generateKeyPair, privateKeyToProtobuf, privateKeyFromProtobuf } from "@libp2p/crypto/keys";
 import { readFile, writeFile } from "node:fs/promises";
@@ -37,9 +39,19 @@ async function main() {
     streamMuxers: [yamux()],
     services: {
       identify: identify(),
+      ping: ping(),
+      dht: kadDHT({
+        // Relay is on a private LAN address — auto-detection won't switch to
+        // server mode, so we force it after startup.
+        peerInfoMapper: passthroughMapper,
+      }),
       relay: circuitRelayServer(),
     },
   });
+
+  // Force DHT server mode — relay has a real listening address but it's a
+  // private LAN IP, so the auto-detection won't promote it from client mode.
+  await (node.services.dht as { setMode(mode: string): Promise<void> }).setMode("server");
 
   // Track connected peers for discovery
   const connectedPeers = new Set<string>();

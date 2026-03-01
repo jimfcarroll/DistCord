@@ -17,6 +17,7 @@
     "@libp2p/circuit-relay-v2": "*",
     "@libp2p/crypto": "*",
     "@libp2p/identify": "*",
+    "@libp2p/kad-dht": "*",
     "@libp2p/peer-id": "*",
     "@libp2p/ping": "*",
     "@libp2p/webrtc": "*",

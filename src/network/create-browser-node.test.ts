@@ -30,13 +30,20 @@ describe("createBrowserNode", () => {
     expect(node.peerId.toString()).toBe(expectedPeerId.toString());
   });
 
-  it("registers identify and ping protocols", async () => {
+  it("registers identify, ping, and kad-dht protocols", async () => {
     const keypair = await generateKeypair();
     node = await createBrowserNode(keypair);
 
     const protocols = node.getProtocols();
     expect(protocols).toContain("/ipfs/id/1.0.0");
     expect(protocols).toContain("/ipfs/ping/1.0.0");
+  });
+
+  it("has DHT service configured", async () => {
+    const keypair = await generateKeypair();
+    node = await createBrowserNode(keypair);
+
+    expect(node.services.dht).toBeDefined();
   });
 
   it("works without bootstrap addresses", async () => {
