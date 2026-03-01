@@ -1,6 +1,6 @@
 # Task-005: Fingerprint and Integration Demo
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -8,24 +8,24 @@ Implement public key fingerprinting — deriving a user ID from a public key by 
 
 ## Acceptance Criteria
 
-- [ ] Write src/identity/fingerprint.test.ts (tests first)
-  - [ ] Produces a 64-character lowercase hex string
-  - [ ] Deterministic (same key → same fingerprint)
-  - [ ] Different keys → different fingerprints
-  - [ ] Output matches manual computation: hex(SHA-256(crypto.subtle.exportKey("raw", publicKey)))
-- [ ] Create src/identity/fingerprint.ts — make tests pass
-  - [ ] fingerprint(publicKey: CryptoKey) → Promise\<Fingerprint\>
-  - [ ] Exports raw public key bytes, SHA-256 hashes them, hex-encodes the result
-- [ ] Export fingerprint from index.ts
-- [ ] Update src/main.ts with full identity demo
-  - [ ] Generate a keypair
-  - [ ] Derive and display the fingerprint (user ID)
-  - [ ] Sign a message
-  - [ ] Verify the signature
-  - [ ] Export the keypair, re-import it, verify signature still works
-  - [ ] All output goes to console.log
-- [ ] Final verification
-  - [ ] npm run dev — browser console shows demo output
-  - [ ] npm run build — produces dist/ successfully
-  - [ ] npm run test — all tests pass
-  - [ ] npm run lint — no errors
+- [x] Write src/identity/fingerprint.test.ts (tests first)
+  - [x] Produces a 64-character lowercase hex string
+  - [x] Deterministic (same key → same fingerprint)
+  - [x] Different keys → different fingerprints
+  - [x] Output matches manual computation: hex(SHA-256(crypto.subtle.exportKey("raw", publicKey)))
+- [x] Create src/identity/fingerprint.ts — make tests pass
+  - [x] fingerprint(publicKey: CryptoKey) → Promise\<Fingerprint\>
+  - [x] Exports raw public key bytes, SHA-256 hashes them, hex-encodes the result
+- [x] Export fingerprint from index.ts
+- [x] Update src/main.ts with full identity demo
+  - [x] Generate a keypair
+  - [x] Derive and display the fingerprint (user ID)
+  - [x] Sign a message
+  - [x] Verify the signature
+  - [x] Export the keypair, re-import it, verify signature still works
+  - [x] All output goes to console.log
+- [x] Final verification
+  - [x] npm run dev — browser console shows demo output
+  - [x] npm run build — produces dist/ successfully
+  - [x] npm run test — all tests pass
+  - [x] npm run lint — no errors
