@@ -50,6 +50,14 @@ The defaults are buried in `@libp2p/circuit-relay-v2/dist/src/constants.js` and 
 - **Fix:** Configure explicit limits: `circuitRelayServer({ reservations: { defaultDurationLimit: 30 * 60 * 1000, defaultDataLimit: BigInt(1 << 27) } })`. Do not set to 0 (unlimited) on a public relay — bad actors could park connections forever.
 - **Discovered:** epic-004 debugging
 
+### Circuit relay reservation timeout is 2 seconds by default
+
+**`node.start()` fails on slow networks (cellular, high-latency WAN).**
+`DEFAULT_RESERVATION_COMPLETION_TIMEOUT` in `@libp2p/circuit-relay-v2/src/constants.ts` is 2000ms. The entire relay dial + WebSocket handshake + reservation protocol must complete within this window. On cellular networks with 200ms+ RTT, this is insufficient — the node crashes on startup with `UnsupportedListenAddressesError`.
+
+- **Fix:** Pass `reservationCompletionTimeout: 15_000` to `circuitRelayTransport()`.
+- **Discovered:** epic-008, phone-on-cellular test
+
 ## libp2p dial behavior
 
 ### `dial(peerId)` prefers relay over WebRTC — must dial `/webrtc` multiaddr explicitly

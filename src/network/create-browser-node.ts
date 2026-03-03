@@ -71,7 +71,11 @@ export async function createBrowserNode(
         },
       }),
       webSockets(),
-      circuitRelayTransport(),
+      circuitRelayTransport({
+        // Default is 2s (DEFAULT_RESERVATION_COMPLETION_TIMEOUT).
+        // Too short for cellular networks with 200ms+ RTT.
+        reservationCompletionTimeout: 15_000,
+      }),
     ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],

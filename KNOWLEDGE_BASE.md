@@ -702,6 +702,20 @@ When hole punching fails, the standard fallback is **TURN** (Traversal Using Rel
 
 **The decentralized solution for later:** Instead of a centralized TURN server, peers with good connectivity (public IP, cone NAT) can volunteer as relays. libp2p's circuit relay already does this — it's the mechanism we use for signaling today. For symmetric NAT peers, the circuit relay connection would stay active as a data path (instead of being replaced by WebRTC). No new infrastructure required — just a policy change: keep the relay stream alive when WebRTC negotiation fails, instead of treating it as signaling-only.
 
+### Mobile Browser Suspend/Resume
+
+When a mobile device locks the screen or the browser moves to background, the OS suspends the browser process. All timers, network I/O, and JavaScript execution freeze. Effects on libp2p:
+
+1. **WebRTC data channels die.** SCTP heartbeats stop. Remote peers detect the failure after 30-60 seconds and fire `peer:disconnect`. The suspended peer doesn't know its connections are dead until it wakes up.
+2. **WebSocket to relay dies.** The TCP keepalive timer expires or the relay's idle timeout closes the connection. The circuit relay reservation is lost — the peer is no longer reachable through the relay.
+3. **DHT presence is lost.** Other peers can no longer discover this peer via `findProviders()`. The peer's provider records remain in the DHT until they expire naturally, but new `findProviders` queries won't find a peer that can't be dialed.
+
+**Detection:** Use a `setInterval` watchdog. Schedule a 5-second interval; if the callback fires with a gap of 10+ seconds, the device was asleep. This is more reliable than the Page Visibility API (`visibilitychange`), which fires on tab switches but not always on screen lock.
+
+**Recovery (implemented in `main.ts`):** On wake detection, re-dial the relay to restore the WebSocket connection and circuit relay reservation. If in a room, re-announce on DHT and re-discover + re-dial peers via `/webrtc`. The `wrapDialWithTimeout` monkeypatch ensures all reconnect dials have a 15-second timeout.
+
+**Discovered:** epic-008, phone-on-cellular test.
+
 ### What Happens in Our System Today
 
 1. Browser connects to relay via WebSocket (`wss://`)

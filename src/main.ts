@@ -1,6 +1,7 @@
 import { generateKeypair, fingerprint } from "./identity/index.js";
 import type { IdentityKeypair } from "./identity/index.js";
 import { createBrowserNode } from "./network/index.js";
+import { rewriteRelayAddr } from "./network/rewrite-relay-addr.js";
 import { computeRoomId, announceRoom, discoverRoom } from "./room/index.js";
 import { createRoomMessaging } from "./messaging/index.js";
 import type { RoomMessaging } from "./messaging/index.js";
@@ -35,6 +36,7 @@ const roomIdEl = document.getElementById("room-id")!;
 const connectedPeers = new Set<string>();
 let relayPeerId: string | null = null;
 let room: RoomMessaging | null = null;
+let currentRoomCid: CID | null = null;
 
 function log(msg: string, cls: "log-system" | "log-sent" | "log-received" = "log-system") {
   const div = document.createElement("div");
@@ -89,19 +91,9 @@ async function main() {
   log("Fetching relay address...");
   const relayInfo = await fetch(RELAY_INFO_URL).then((r) => r.json());
   // Rewrite relay addrs to match configured host/port so it works across machines.
-  // WSS mode (via dev proxy): /dns4/<host>/tcp/<proxy-port>/wss/...
-  // Plain mode (localhost):   /ip4/<host>/tcp/<relay-port>/ws/...
-  const relayAddrs: string[] = (relayInfo.addrs as string[]).map((a) => {
-    if (RELAY_WSS) {
-      return a
-        .replace(/\/ip4\/[^/]+\//, `/dns4/${RELAY_HOST}/`)
-        .replace(/\/tcp\/\d+\//, `/tcp/${RELAY_PORT}/`)
-        .replace(/\/ws\//, "/wss/");
-    }
-    return a
-      .replace(/\/ip4\/[^/]+\//, `/ip4/${RELAY_HOST}/`)
-      .replace(/\/tcp\/\d+\//, `/tcp/${RELAY_WS_PORT}/`);
-  });
+  const relayAddrs: string[] = (relayInfo.addrs as string[]).map((a) =>
+    rewriteRelayAddr(a, RELAY_HOST, RELAY_PORT, RELAY_WSS, RELAY_WS_PORT),
+  );
   log(`Relay: ${relayAddrs[0]}`);
 
   // Extract relay PeerId from multiaddr (last /p2p/<id> segment)
@@ -214,6 +206,55 @@ async function main() {
     });
   }
 
+  // Reconnect after device sleep/suspend.
+  // When a browser is suspended (phone screen off, tab backgrounded),
+  // setInterval callbacks freeze.  If the callback fires much later than
+  // expected, the device was asleep and all connections are likely dead.
+  async function reconnect() {
+    log("Reconnecting...");
+
+    // Re-dial relay (WebSocket + circuit relay reservation)
+    for (const addr of relayAddrs) {
+      node.dial(multiaddr(addr)).catch((err: unknown) => {
+        log(`Relay reconnect failed: ${err}`);
+      });
+    }
+
+    // If in a room, re-announce and re-discover peers
+    if (currentRoomCid) {
+      announceRoom(node, currentRoomCid).catch(() => {});
+      try {
+        for await (const provider of discoverRoom(node, currentRoomCid)) {
+          const pid = provider.id.toString();
+          if (pid === node.peerId.toString()) continue;
+          if (connectedPeers.has(pid)) continue;
+
+          const webrtcAddr = multiaddr(
+            `${relayAddrs[0]}/p2p-circuit/webrtc/p2p/${pid}`,
+          );
+          node
+            .dial(webrtcAddr)
+            .then(() => log(`Reconnected to ${short(pid)}`))
+            .catch((err: unknown) => {
+              log(`Reconnect dial failed: ${err}`);
+            });
+        }
+      } catch (err) {
+        log(`Reconnect discovery failed: ${err}`);
+      }
+    }
+  }
+
+  let lastTick = Date.now();
+  setInterval(() => {
+    const now = Date.now();
+    if (now - lastTick > 10_000) {
+      log("Device resumed from sleep — reconnecting...");
+      reconnect();
+    }
+    lastTick = now;
+  }, 5_000);
+
   // Create Room
   createRoomBtn.addEventListener("click", async () => {
     const name = roomNameInput.value.trim();
@@ -221,6 +262,7 @@ async function main() {
 
     const nonce = crypto.randomUUID();
     const cid = await computeRoomId(keypair.publicKey, name, nonce);
+    currentRoomCid = cid;
     showRoomId(cid);
     log(`Created room "${name}"`);
     log(`Room ID: ${cid.toString()}`);
@@ -250,6 +292,7 @@ async function main() {
       return;
     }
 
+    currentRoomCid = cid;
     showRoomId(cid);
     log(`Joining room ${cid.toString().slice(-8)}...`);
 
