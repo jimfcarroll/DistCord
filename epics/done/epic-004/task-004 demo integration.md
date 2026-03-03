@@ -24,7 +24,7 @@ Update `src/main.ts` and `index.html` to use GossipSub room messaging instead of
 - [x] Send enables on room join, not peer selection
 - [x] Received messages show sender fingerprint
 - [x] Invalid messages dropped (handled by `verifyChatMessage` in room-messaging layer)
-- [ ] Two browsers exchange messages in real time (manual browser test)
+- [x] Two browsers exchange messages in real time (manual browser test)
 - [x] All existing tests pass, build and lint clean
 
 ## Notes
