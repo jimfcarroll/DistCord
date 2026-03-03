@@ -1,6 +1,8 @@
 # Known Issues — Third-Party Libraries
 
-Known gotchas with third-party libraries encountered during development. The common thread with js-libp2p packages is **silent failure** — misconfigurations produce no errors, just broken behavior. Start here when debugging connectivity or DHT problems.
+Terse technical reference of confirmed gotchas with third-party libraries. Each entry documents a specific failure mode, its root cause, and the fix or workaround. For deeper explanations with full context and debugging narratives, see `KNOWLEDGE_BASE.md`.
+
+The common thread with js-libp2p packages is **silent failure** — misconfigurations produce no errors, just broken behavior. Start here when debugging connectivity or DHT problems.
 
 ## `@libp2p/bootstrap`
 

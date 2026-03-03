@@ -60,9 +60,9 @@ It works because the creator's key is the single root of trust. No proof-of-work
 
 ### Roles & Capabilities
 
-**Phase 1 — Static roles:** A fixed set (`OWNER | MOD | MEMBER | BANNED`) covers most use cases and keeps validation simple.
+**Static roles:** A fixed set (`OWNER | MOD | MEMBER | BANNED`) covers most use cases and keeps validation simple.
 
-**Phase 2 — Capability bitmasks:** User-defined roles with granular permissions (`CAN_BAN | CAN_DELETE | CAN_INVITE | CAN_PIN`, etc.). Role definitions are additional `DEFINE_ROLE` entries in the authority log:
+**Capability bitmasks:** For finer control, user-defined roles with granular permissions (`CAN_BAN | CAN_DELETE | CAN_INVITE | CAN_PIN`, etc.). Role definitions are additional `DEFINE_ROLE` entries in the authority log:
 
 ```
 Entry: {
@@ -168,11 +168,9 @@ Any room that cares about persistence will realistically have at least one alway
 | [Tox](https://tox.chat/) | P2P | Encrypted messaging with DHT peer discovery |
 | [Briar](https://briarproject.org/) | P2P | Messaging over Tor, very privacy-focused |
 
-## Implementation Strategy
+## Technology
 
-Start with the **authority log + message gossip layer** — that's the novel part. The DHT and crypto are well-trodden. Key libraries to evaluate:
-
-- [js-libp2p](https://github.com/libp2p/js-libp2p) — DHT + WebRTC transport
-- [WebCrypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) — identity and signing
-- WebRTC data channels — gossip layer
-- IndexedDB — local persistence
+- [js-libp2p](https://github.com/libp2p/js-libp2p) — Kademlia DHT + WebRTC transport + GossipSub messaging
+- [WebCrypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) — Ed25519 identity and signing
+- WebRTC data channels — direct peer-to-peer communication
+- IndexedDB — local persistence of authority logs and message history

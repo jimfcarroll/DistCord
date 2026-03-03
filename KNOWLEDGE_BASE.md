@@ -1,8 +1,14 @@
-# How This System Works (And Everything That Went Wrong)
+# Knowledge Base
 
-Reference material for AI agents. When the human asks how something works, why something broke, or how the protocols interact, use this file as the basis for your explanation. The human is a senior developer (Java/C/C++/Python) learning the JavaScript/libp2p ecosystem — explain in those terms.
+Reference material for AI agents and the human developer. When the human asks how something works, why something broke, or how the protocols interact, use this file as the basis for your explanation. The human is a senior developer (Java/C/C++/Python) learning the JavaScript/libp2p ecosystem — explain in those terms.
 
-Covers the full protocol stack from transport to application, the intended message flow, every failure mode encountered during development (with root causes, dead ends, and fixes), and the JavaScript ecosystem pitfalls that made debugging harder.
+This file serves two purposes:
+1. **For AI agents** — context for answering technical questions, explaining failures, and avoiding past mistakes
+2. **For the human** — a single place to revisit how things work and why decisions were made
+
+Covers the full protocol stack from transport to application, architectural decisions, the intended message flow, every failure mode encountered during development (with root causes, dead ends, and fixes), and the JavaScript ecosystem pitfalls that made debugging harder.
+
+For terse fix/workaround reference (not explanations), see `KNOWN_ISSUES.md`.
 
 ---
 
@@ -30,6 +36,26 @@ WebRTC was designed for video calls. It creates encrypted UDP channels between t
 But WebRTC has a hard prerequisite: **signaling**. Before two browsers can talk directly, they must exchange connection metadata (SDP offers, ICE candidates) through some out-of-band channel. They need a mutual friend to introduce them. This is the one irreducible centralization point — you need at least one server to bootstrap the first connection.
 
 Our architecture: a lightweight relay server that browsers connect to via WebSocket. The relay introduces peers, helps with NAT traversal, and can forward bytes when direct connections fail. After the introduction, browsers talk directly over WebRTC. The relay is dumb and replaceable — if it disappears, peers who already know each other continue working.
+
+### Why Not Electron?
+
+An Electron app would simplify networking enormously — raw UDP/TCP, stock Kademlia, no signaling needed. But the browser-only approach:
+
+- Removes all barriers to entry (click a link and you're in)
+- js-libp2p handles the WebRTC complexity for us
+- If it works in the browser, adding native transports later is trivial (libp2p supports multiple transports simultaneously)
+
+### Architectural Pivot: Relay-Centric → DHT-Centric
+
+The project initially planned a central WebSocket relay server that would handle all message routing between browsers, to be gradually replaced with peer-to-peer connections. Reviewing the README and GENESIS design documents revealed this was architecturally wrong — the system is modeled on BitTorrent's DHT, not a central relay. The relay should only bootstrap connections and assist with signaling, not sit in the data path. This realization moved DHT implementation from a late-stage goal to the core of the architecture.
+
+### Key Decisions
+
+1. **Browser-only** — the app runs entirely in the browser. No Electron.
+2. **js-libp2p** — handles WebRTC transport, Kademlia DHT, circuit relay, GossipSub pub/sub. We focus on the novel parts (authority log, rooms, messaging).
+3. **DHT is central** — it's the backbone of discovery, not an afterthought.
+4. **No central relay** — peers communicate directly over WebRTC. The only server is a bootstrap/relay node (equivalent to `router.bittorrent.com`).
+5. **Ed25519 identity integrates with libp2p** — libp2p uses Ed25519 by default for PeerId, aligning with our identity system.
 
 ---
 
@@ -83,17 +109,37 @@ This is an event-driven system. Services don't actively poll for peers — they 
 
 **Kademlia** is a distributed hash table (DHT) — the same algorithm that BitTorrent uses for trackerless torrents. Every peer has a random 256-bit node ID. The "distance" between two IDs is their XOR — this is a mathematical metric, not a geographic one. Peers maintain a routing table of other peers, organized by XOR distance.
 
+**Nodes vs keys:** "Nodes" are the participating machines (BitTorrent clients, or in our case, browsers). "Keys" are the lookup values (torrent info hashes, or room IDs). Every node in the DHT is responsible for storing peer lists for keys that are numerically close to its own random node ID.
+
 **Key operations:**
 
 - `provide(key)` — "I am serving this content." Announces to the DHT that your peer ID is associated with a key (in our case, a room ID). The DHT stores this association on the peers whose node IDs are closest to the key.
 
 - `findProviders(key)` — "Who is serving this content?" Queries the DHT for peers associated with a key. The query is routed hop-by-hop through peers whose IDs are progressively closer to the key, until it reaches the peers storing the provider records.
 
+**Iterative lookup:** To find peers for a key K, you ask the nodes you know that are closest to K. They point you to nodes even closer. You repeat until you find the nodes responsible for K. Completes in O(log n) hops — about 23 hops in a network of 10 million nodes.
+
+**Magnet links — the analogy:** A BitTorrent magnet link contains only an info hash — a DHT key. Your client (already in the DHT from startup) does a lookup, finds peers, connects, and downloads. No tracker, no .torrent file. The DHT is the entire discovery mechanism. Our room IDs work identically: share the room ID out-of-band (URL, QR code), the browser looks it up on the DHT, finds peers, connects.
+
 **In our system:** A room ID is `H(creator_pubkey + room_name + nonce)` — a deterministic hash. The creator calls `provide(roomId)` to announce. A joiner calls `findProviders(roomId)` to discover peers in that room, then dials them directly.
 
 **Server mode vs. client mode:** The relay runs in DHT server mode — it stores provider records and answers queries from other peers. Browsers run in client mode — they make queries but don't store records for others. This is necessary because browsers can't accept inbound connections, so they'd be unreliable DHT servers.
 
 **Routing table population:** After a connection is established and Identify completes, the DHT topology listener tries to add the peer to its routing table. This is not instant — it involves a verification ping and internal bookkeeping. There is no "DHT ready" event. You have to poll the routing table size or use a heuristic to know when it's safe to issue queries.
+
+**DHT queries over WebRTC — the cost concern:** In BitTorrent, contacting a new DHT node is cheap (fire a UDP packet). In WebRTC, every new connection requires signaling. Does the DHT become impractically expensive? No — DHT queries are **relayed through existing connections**, not by establishing new WebRTC connections per hop. When you ask peer A about key K, A forwards your query to peer B (who A is already connected to), B responds back through A. The lookup still converges in O(log n) hops, but queries travel through the existing peer mesh. You only establish new direct connections for long-term relationships (joining a room).
+
+**Decentralization comparison with BitTorrent:**
+
+| Aspect          | BitTorrent            | This project (WebRTC)                   |
+| --------------- | --------------------- | --------------------------------------- |
+| Bootstrap       | Hardcoded node list   | Hardcoded node list                     |
+| Discovery       | DHT over UDP          | DHT over WebRTC                         |
+| New connections | Direct TCP to IP:port | SDP/ICE exchange through existing peers |
+| Relay fallback  | N/A                   | Peer-based relay for symmetric NATs     |
+| After bootstrap | Fully P2P             | Fully P2P                               |
+
+WebRTC does not add centralization beyond the same bootstrap that BitTorrent needs. The signaling server is the exact equivalent of BitTorrent's bootstrap nodes.
 
 ### Layer 6: Messaging — GossipSub
 
