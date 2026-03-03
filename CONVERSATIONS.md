@@ -52,13 +52,13 @@ No — DHT queries are **relayed through existing connections**, not by establis
 
 ### Decentralization comparison
 
-| Aspect | BitTorrent | This project (WebRTC) |
-|---|---|---|
-| Bootstrap | Hardcoded node list | Hardcoded node list |
-| Discovery | DHT over UDP | DHT over WebRTC |
+| Aspect          | BitTorrent            | This project (WebRTC)                   |
+| --------------- | --------------------- | --------------------------------------- |
+| Bootstrap       | Hardcoded node list   | Hardcoded node list                     |
+| Discovery       | DHT over UDP          | DHT over WebRTC                         |
 | New connections | Direct TCP to IP:port | SDP/ICE exchange through existing peers |
-| Relay fallback | N/A | Peer-based relay for symmetric NATs |
-| After bootstrap | Fully P2P | Fully P2P |
+| Relay fallback  | N/A                   | Peer-based relay for symmetric NATs     |
+| After bootstrap | Fully P2P             | Fully P2P                               |
 
 WebRTC does not add centralization beyond the same bootstrap that BitTorrent needs. The signaling server is the exact equivalent of BitTorrent's bootstrap nodes.
 

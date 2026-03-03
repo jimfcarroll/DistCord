@@ -17,6 +17,7 @@ describe("createBrowserNode", () => {
   it("starts and stops cleanly", async () => {
     const keypair = await generateKeypair();
     node = await createBrowserNode(keypair);
+    await node.start();
     expect(node).toBeDefined();
     await node.stop();
     node = undefined;
@@ -33,6 +34,7 @@ describe("createBrowserNode", () => {
   it("registers identify, ping, and kad-dht protocols", async () => {
     const keypair = await generateKeypair();
     node = await createBrowserNode(keypair);
+    await node.start();
 
     const protocols = node.getProtocols();
     expect(protocols).toContain("/ipfs/id/1.0.0");

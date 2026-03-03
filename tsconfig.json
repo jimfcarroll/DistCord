@@ -11,6 +11,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "types": ["vite/client"],
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "outDir": "dist",
     "declaration": true,

@@ -5,9 +5,15 @@ import { computeRoomId, announceRoom, discoverRoom } from "./room/index.js";
 import { createRoomMessaging } from "./messaging/index.js";
 import type { RoomMessaging } from "./messaging/index.js";
 import { CID } from "multiformats/cid";
+import { multiaddr } from "@multiformats/multiaddr";
 import type { Libp2p, PeerId, IdentifyResult } from "@libp2p/interface";
 
-const RELAY_INFO_URL = "http://localhost:9002/";
+const RELAY_HOST = import.meta.env.VITE_RELAY_HOST ?? "localhost";
+const RELAY_WS_PORT = import.meta.env.VITE_RELAY_WS_PORT ?? "9001";
+const RELAY_WSS = import.meta.env.VITE_RELAY_WSS === "true";
+const PROXY_PORT = import.meta.env.VITE_PROXY_PORT ?? "8443";
+// Relative path — works through both Vite dev proxy and the TLS reverse proxy
+const RELAY_INFO_URL = "/relay-info";
 
 // DOM elements
 const peerIdEl = document.getElementById("peer-id")!;
@@ -82,7 +88,20 @@ async function main() {
 
   log("Fetching relay address...");
   const relayInfo = await fetch(RELAY_INFO_URL).then((r) => r.json());
-  const relayAddrs: string[] = relayInfo.addrs;
+  // Rewrite relay addrs to match configured host/port so it works across machines.
+  // WSS mode (via dev proxy): /dns4/<host>/tcp/<proxy-port>/wss/...
+  // Plain mode (localhost):   /ip4/<host>/tcp/<relay-port>/ws/...
+  const relayAddrs: string[] = (relayInfo.addrs as string[]).map((a) => {
+    if (RELAY_WSS) {
+      return a
+        .replace(/\/ip4\/[^/]+\//, `/dns4/${RELAY_HOST}/`)
+        .replace(/\/tcp\/\d+\//, `/tcp/${PROXY_PORT}/`)
+        .replace(/\/ws\//, "/wss/");
+    }
+    return a
+      .replace(/\/ip4\/[^/]+\//, `/ip4/${RELAY_HOST}/`)
+      .replace(/\/tcp\/\d+\//, `/tcp/${RELAY_WS_PORT}/`);
+  });
   log(`Relay: ${relayAddrs[0]}`);
 
   // Extract relay PeerId from multiaddr (last /p2p/<id> segment)
@@ -112,20 +131,61 @@ async function main() {
     updatePeersUI();
   });
 
-  // Wait for identify to confirm relay supports kadDHT before enabling room controls.
-  // The old 2-second setTimeout was a blind guess that broke when GossipSub added
-  // extra protocols to negotiate, making the identify exchange slower.
+  // Wait for identify to confirm relay supports kadDHT, then poll until the
+  // routing table is populated.  The topology listener should add the relay
+  // automatically, but due to race conditions in libp2p's registrar (topology
+  // registered after identify fires, or ping verification delay), it can fail.
+  // Fallback: seed the routing table directly after 3 seconds.
   node.addEventListener("peer:identify", (evt: CustomEvent<IdentifyResult>) => {
     const { peerId, protocols } = evt.detail;
+    const detail = evt.detail as unknown as {
+      connection?: { limits?: unknown; remoteAddr?: { toString(): string } };
+    };
+    const limited = detail.connection?.limits != null;
+    const remoteAddr = detail.connection?.remoteAddr?.toString() ?? "";
+    const connType = remoteAddr.includes("/webrtc")
+      ? "webrtc"
+      : remoteAddr.includes("/p2p-circuit")
+      ? "relay"
+      : "other";
+    log(`Identify: ${short(peerId.toString())} ${connType} limited=${limited}`);
+
     if (peerId.toString() !== relayPeerId) return;
     if (!protocols.includes("/ipfs/kad/1.0.0")) return;
 
-    // kadDHT topology listener processes identify results asynchronously —
-    // give it a moment to update the routing table
-    setTimeout(() => {
-      createRoomBtn.disabled = false;
-      joinRoomBtn.disabled = false;
-      log("DHT ready");
+    const dht = node.services.dht as unknown as {
+      routingTable: { size: number; add(peerId: unknown, opts?: unknown): Promise<void> };
+      getMode(): string;
+    };
+
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+
+      if (dht.routingTable.size > 0) {
+        clearInterval(poll);
+        log(`DHT mode=${dht.getMode()} routing_table=${dht.routingTable.size}`);
+        createRoomBtn.disabled = false;
+        joinRoomBtn.disabled = false;
+        log("DHT ready");
+        return;
+      }
+
+      // After 3 s the topology system hasn't populated the table — seed it
+      // manually by calling routingTable.add() which pings then inserts.
+      if (attempts >= 6) {
+        clearInterval(poll);
+        log("Topology listener did not populate routing table — seeding manually");
+        try {
+          await dht.routingTable.add(peerId);
+          log(`DHT mode=${dht.getMode()} routing_table=${dht.routingTable.size}`);
+          createRoomBtn.disabled = false;
+          joinRoomBtn.disabled = false;
+          log("DHT ready (manual seed)");
+        } catch (err) {
+          log(`Failed to seed routing table: ${err}`);
+        }
+      }
     }, 500);
   });
 
@@ -141,6 +201,19 @@ async function main() {
     updatePeersUI();
   });
 
+  // Start the node AFTER handlers are registered.  createBrowserNode uses
+  // start:false so we don't miss peer:connect / peer:identify events fired
+  // when the circuit relay transport connects during startup.
+  await node.start();
+  log("libp2p started");
+
+  // Dial relay explicitly to trigger identify and DHT topology registration.
+  for (const addr of relayAddrs) {
+    node.dial(multiaddr(addr)).catch((err: unknown) => {
+      log(`Relay dial failed: ${err}`);
+    });
+  }
+
   // Create Room
   createRoomBtn.addEventListener("click", async () => {
     const name = roomNameInput.value.trim();
@@ -155,6 +228,8 @@ async function main() {
     enterRoom(node, keypair, cid, fp);
 
     try {
+      const dht = node.services.dht as unknown as { routingTable: { size: number } };
+      log(`DHT provide — routing_table=${dht.routingTable.size}`);
       await announceRoom(node, cid);
       log("Announced on DHT — waiting for peers to join");
     } catch (err) {
@@ -183,17 +258,32 @@ async function main() {
     // Also announce ourselves so future peers can find us
     announceRoom(node, cid).catch(() => {});
 
+    // DHT discovery — find peers who announced this room
     try {
-      let found = 0;
       for await (const provider of discoverRoom(node, cid)) {
         const pid = provider.id.toString();
         if (pid === node.peerId.toString()) continue;
-        found++;
-        log(`Found peer: ${short(pid)}`);
-        node.dial(provider.id).catch(() => {});
-      }
-      if (found === 0) {
-        log("No peers found — room may be empty or DHT not yet populated");
+
+        // Prefer /webrtc multiaddrs for direct P2P connection.
+        // dial(peerId) tries /p2p-circuit first → limited relay connection.
+        // dial(webrtcAddr) triggers WebRTC signaling → direct data channel.
+        const webrtcAddrs = (provider.multiaddrs ?? []).filter((ma) =>
+          ma.toString().includes("/webrtc"),
+        );
+        log(`Found peer via DHT: ${short(pid)} (${webrtcAddrs.length} webrtc addrs)`);
+
+        if (webrtcAddrs.length > 0) {
+          node.dial(webrtcAddrs[0]).catch((err: unknown) => {
+            log(`WebRTC dial failed, trying relay: ${err}`);
+            node.dial(provider.id).catch((err2: unknown) => {
+              log(`Relay dial ${short(pid)} also failed: ${err2}`);
+            });
+          });
+        } else {
+          node.dial(provider.id).catch((err: unknown) => {
+            log(`Dial ${short(pid)} failed: ${err}`);
+          });
+        }
       }
     } catch (err) {
       log(`DHT discovery failed: ${err}`);
