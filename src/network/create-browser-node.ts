@@ -8,6 +8,7 @@ import { identify, identifyPush } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
 import { kadDHT, passthroughMapper } from "@libp2p/kad-dht";
 import { gossipsub } from "@chainsafe/libp2p-gossipsub";
+import { FaultTolerance } from "@libp2p/interface";
 import type { Libp2p } from "@libp2p/interface";
 import type { IdentityKeypair } from "../identity/types.js";
 import { keypairToLibp2pKey } from "./identity-bridge.js";
@@ -83,6 +84,11 @@ export async function createBrowserNode(
       // Allow insecure WebSocket (ws://) and private IPs (127.0.0.1) for dev.
       // The browser default blocks both, which prevents connecting to a local relay.
       denyDialMultiaddr: () => false,
+    },
+    transportManager: {
+      // Let the node start even if circuit relay reservation times out.
+      // The explicit node.dial() after startup retries the connection.
+      faultTolerance: FaultTolerance.NO_FATAL,
     },
     services: {
       identify: identify(),

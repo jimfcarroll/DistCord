@@ -727,6 +727,17 @@ When a mobile device locks the screen or the browser moves to background, the OS
 
 The `Identify: ... webrtc limited=false` log line confirms a direct connection. `limited=true` means traffic is still going through the relay.
 
+### Relay→WebRTC Upgrade Pattern
+
+When a peer connects via relay circuit (limited=true) BEFORE the outbound WebRTC dial, GossipSub will NOT bind to the subsequent WebRTC connection. The `peer:identify` event does not fire for the second connection despite all code paths suggesting it should. This is a subtle libp2p bug — static analysis of the identify service, registrar, and GossipSub topology shows no dedup, yet the behavior is consistent.
+
+**Workaround:** Before dialing `/webrtc` to a peer, call `node.hangUp(peerId)` to close all existing connections. This ensures the WebRTC connection is the first (and only) connection, which reliably triggers identify → registrar → GossipSub topology notification → mesh formation.
+
+This pattern is applied in three places in `main.ts`:
+1. **Join room flow** — DHT discovery finds peers already connected via relay
+2. **Reconnect-on-wake flow** — peers may have stale connections after device sleep
+3. **`peer:identify` handler** — inbound relay connections from peers arriving after the join flow
+
 ---
 
 ## Summary

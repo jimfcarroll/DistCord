@@ -142,6 +142,24 @@ async function main() {
       : "other";
     log(`Identify: ${short(peerId.toString())} ${connType} limited=${limited}`);
 
+    // Upgrade relay-only peers to WebRTC so GossipSub can use them.
+    // Must hangUp first — GossipSub won't bind to WebRTC if a relay
+    // connection already exists (libp2p identify/registrar issue).
+    if (peerId.toString() !== relayPeerId && limited && connType === "relay") {
+      const pid = peerId.toString();
+      node.hangUp(peerId).then(() => {
+        const webrtcAddr = multiaddr(
+          `${relayAddrs[0]}/p2p-circuit/webrtc/p2p/${pid}`,
+        );
+        log(`Upgrading ${short(pid)} to WebRTC...`);
+        return node.dial(webrtcAddr);
+      })
+        .then(() => log(`WebRTC upgrade to ${short(peerId.toString())} succeeded`))
+        .catch((err: unknown) => {
+          log(`WebRTC upgrade failed: ${err}`);
+        });
+    }
+
     if (peerId.toString() !== relayPeerId) return;
     if (!protocols.includes("/ipfs/kad/1.0.0")) return;
 
@@ -227,7 +245,13 @@ async function main() {
         for await (const provider of discoverRoom(node, currentRoomCid)) {
           const pid = provider.id.toString();
           if (pid === node.peerId.toString()) continue;
-          if (connectedPeers.has(pid)) continue;
+
+          // hangUp stale connections so WebRTC is the first connection
+          // (same GossipSub/relay workaround as join flow)
+          if (connectedPeers.has(pid)) {
+            await node.hangUp(provider.id);
+            connectedPeers.delete(pid);
+          }
 
           const webrtcAddr = multiaddr(
             `${relayAddrs[0]}/p2p-circuit/webrtc/p2p/${pid}`,
@@ -309,11 +333,16 @@ async function main() {
 
         log(`Found peer via DHT: ${short(pid)}`);
 
-        // Construct /webrtc addr using OUR relay address, not the peer's.
-        // DHT provider records contain the peer's self-reported relay address
-        // (e.g. homer-prime:8443) which WAN browsers can't resolve.
-        // Using our own relay address works because it's the same relay server —
-        // just accessed through an address we can actually reach.
+        // Close existing relay connections before dialing WebRTC.
+        // If a peer already connected via relay (limited=true), GossipSub
+        // won't bind to a subsequent WebRTC connection (libp2p identify/
+        // registrar issue). hangUp ensures WebRTC is the first connection.
+        const existingConns = node.getConnections(provider.id);
+        if (existingConns.length > 0) {
+          log(`Closing ${existingConns.length} existing connection(s) to ${short(pid)}`);
+          await node.hangUp(provider.id);
+        }
+
         const webrtcAddr = multiaddr(
           `${relayAddrs[0]}/p2p-circuit/webrtc/p2p/${pid}`,
         );

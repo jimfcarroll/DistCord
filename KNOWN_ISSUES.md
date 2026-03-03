@@ -55,7 +55,7 @@ The defaults are buried in `@libp2p/circuit-relay-v2/dist/src/constants.js` and 
 **`node.start()` fails on slow networks (cellular, high-latency WAN).**
 `DEFAULT_RESERVATION_COMPLETION_TIMEOUT` in `@libp2p/circuit-relay-v2/src/constants.ts` is 2000ms. The entire relay dial + WebSocket handshake + reservation protocol must complete within this window. On cellular networks with 200ms+ RTT, this is insufficient — the node crashes on startup with `UnsupportedListenAddressesError`.
 
-- **Fix:** Pass `reservationCompletionTimeout: 15_000` to `circuitRelayTransport()`.
+- **Fix:** Pass `reservationCompletionTimeout: 15_000` to `circuitRelayTransport()` and set `transportManager: { faultTolerance: FaultTolerance.NO_FATAL }` so the node starts even if the reservation times out. The explicit relay dial after startup retries the connection.
 - **Discovered:** epic-008, phone-on-cellular test
 
 ## libp2p dial behavior
@@ -158,6 +158,16 @@ Key source locations:
 - **Fix:** Remove `runOnLimitedConnection: true` from the GossipSub config. With the default (`false`), the registrar skips limited connections *before* setting the filter, so WebRTC is the first connection GossipSub sees. Messages then flow directly over WebRTC, surviving relay shutdown.
 - **Tradeoff:** Messages don't flow until WebRTC establishes (a few seconds). If WebRTC fails (symmetric NAT), messages never flow — acceptable for P2P architecture.
 - **Discovered:** epic-008
+
+### GossipSub doesn't bind to WebRTC when relay connection exists
+
+**Messages don't flow despite WebRTC connections being established.**
+When a peer connects via relay (limited=true) before the WebRTC connection, GossipSub never binds to the subsequent WebRTC connection. `peer:identify` does not fire for the WebRTC connection despite all code paths suggesting it should. The identify service, registrar, and GossipSub topology are all coded correctly — the issue is a subtle race condition or dedup in libp2p internals.
+
+This only manifests when peers connect via relay circuit BEFORE the WebRTC dial (e.g., after a browser refresh when other peers' DHT queries discover the new peer and dial via relay). In the initial flow (no prior relay connection), WebRTC is the first connection and GossipSub binds correctly.
+
+- **Workaround:** Before dialing WebRTC, `hangUp` existing connections to that peer. This ensures WebRTC is the first (and only) connection, matching the pattern that works reliably.
+- **Discovered:** epic-008, VPN browser refresh test
 
 ### TypeScript type mismatch with `libp2p@3.x`
 
