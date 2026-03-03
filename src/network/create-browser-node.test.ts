@@ -1,8 +1,8 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Libp2p } from "@libp2p/interface";
 import { generateKeypair } from "../identity/index.js";
 import { keypairToPeerId } from "./identity-bridge.js";
-import { createBrowserNode } from "./create-browser-node.js";
+import { createBrowserNode, wrapDialWithTimeout } from "./create-browser-node.js";
 
 describe("createBrowserNode", () => {
   let node: Libp2p | undefined;
@@ -60,5 +60,71 @@ describe("createBrowserNode", () => {
     node = await createBrowserNode(keypair);
 
     expect(node.getPeers()).toHaveLength(0);
+  });
+
+  it("applies dial timeout monkeypatch", async () => {
+    const keypair = await generateKeypair();
+    node = await createBrowserNode(keypair);
+
+    // The monkeypatch sets dial as an own property, shadowing the prototype
+    expect(node.hasOwnProperty("dial")).toBe(true);
+  });
+});
+
+describe("wrapDialWithTimeout", () => {
+  it("injects AbortSignal.timeout when caller provides no signal", async () => {
+    const mockDial = vi.fn().mockResolvedValue({});
+    const wrapped = wrapDialWithTimeout(mockDial);
+
+    await wrapped("fake-peer");
+
+    expect(mockDial).toHaveBeenCalledOnce();
+    const [peer, options] = mockDial.mock.calls[0];
+    expect(peer).toBe("fake-peer");
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("injects AbortSignal.timeout when options exist but signal is missing", async () => {
+    const mockDial = vi.fn().mockResolvedValue({});
+    const wrapped = wrapDialWithTimeout(mockDial);
+
+    await wrapped("fake-peer", { force: true });
+
+    const [, options] = mockDial.mock.calls[0];
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(options.force).toBe(true);
+  });
+
+  it("preserves caller-provided AbortSignal", async () => {
+    const mockDial = vi.fn().mockResolvedValue({});
+    const wrapped = wrapDialWithTimeout(mockDial);
+    const callerSignal = AbortSignal.timeout(5_000);
+
+    await wrapped("fake-peer", { signal: callerSignal });
+
+    const [, options] = mockDial.mock.calls[0];
+    expect(options.signal).toBe(callerSignal);
+  });
+
+  it("preserves all other options alongside injected signal", async () => {
+    const mockDial = vi.fn().mockResolvedValue({});
+    const wrapped = wrapDialWithTimeout(mockDial);
+
+    await wrapped("fake-peer", { force: true });
+
+    const [, options] = mockDial.mock.calls[0];
+    expect(options.force).toBe(true);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("passes through undefined options correctly", async () => {
+    const mockDial = vi.fn().mockResolvedValue({});
+    const wrapped = wrapDialWithTimeout(mockDial);
+
+    await wrapped("fake-peer");
+
+    const [, options] = mockDial.mock.calls[0];
+    // Should have signal but no other spurious keys
+    expect(Object.keys(options)).toEqual(["signal"]);
   });
 });

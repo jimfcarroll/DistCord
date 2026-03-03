@@ -82,13 +82,13 @@ A blind `setTimeout` is unreliable — the required delay depends on how many pr
 - **Workaround:** Listen for the `peer:identify` event, verify the peer's protocols include `/ipfs/kad/1.0.0`, then allow a short delay (500ms) for the topology listener to update the routing table. This is event-driven instead of time-based.
 - **Discovered:** epic-003, updated epic-004
 
-### `provide()` and `findProviders()` have no default timeout
+### `provide()`, `findProviders()`, and `dial()` have no default timeout
 
-**Operations hang forever if the routing table is empty.**
-`contentRouting.provide()` internally calls `findClosestPeers()`. With an empty routing table, the DHT query waits indefinitely for responses from non-existent peers. No timeout, no error — just a permanent hang. Similarly, `findProviders()` can hang if the routing table has no entries.
+**Operations hang forever if the routing table is empty or the dial target is unreachable.**
+`contentRouting.provide()` internally calls `findClosestPeers()`. With an empty routing table, the DHT query waits indefinitely for responses from non-existent peers. No timeout, no error — just a permanent hang. Similarly, `findProviders()` can hang if the routing table has no entries. `dial()` can also hang indefinitely when the target peer is unreachable — observed during WAN testing when a WebRTC dial produced no error and no success.
 
-- **Workaround:** Always pass `{ signal: AbortSignal.timeout(30_000) }` to `provide()` and `findProviders()`.
-- **Discovered:** epic-004
+- **Workaround:** Always pass `{ signal: AbortSignal.timeout(N) }` to `provide()` and `findProviders()`. For `dial()`, we monkeypatch `node.dial` in `create-browser-node.ts` with a 15s default timeout via `wrapDialWithTimeout` so callers don't need to remember.
+- **Discovered:** epic-004, extended epic-008
 
 ## `@chainsafe/libp2p-gossipsub`
 
@@ -134,6 +134,22 @@ Key source locations:
 
 - **Fix:** Pin all libp2p packages to their latest `@libp2p/interface@^2.x`-compatible versions. Replace `"*"` wildcards. Compatible versions: `libp2p@~2.10`, `@chainsafe/libp2p-noise@~16.1`, `@chainsafe/libp2p-yamux@~7.0`, `@libp2p/bootstrap@~11.0`, `@libp2p/circuit-relay-v2@~3.2`, `@libp2p/crypto@~5.1`, `@libp2p/identify@~3.0`, `@libp2p/kad-dht@~15.1`, `@libp2p/ping@~2.0`, `@libp2p/webrtc@~5.2`, `@libp2p/websockets@~9.2`.
 - **Discovered:** epic-004 debugging, root-caused across multiple sessions
+
+### `runOnLimitedConnection: true` prevents GossipSub from using WebRTC
+
+**Messages flow through the relay instead of the direct WebRTC data channel. Killing the relay kills messaging even though `webrtc limited=false` is confirmed.**
+
+libp2p's registrar notifies each topology (like GossipSub) exactly once per peer via a `topology.filter`. Whichever connection arrives first wins. The relay (circuit) connection always establishes before WebRTC (WebRTC requires SDP/ICE exchange via the relay). With `runOnLimitedConnection: true`, GossipSub accepts the relay connection, the filter marks the peer as "seen", and the later WebRTC connection notification is skipped.
+
+GossipSub's `createOutboundStream` also has a gate: `if (this.streamsOutbound.has(id)) return` — even if the topology filter didn't block it, GossipSub wouldn't replace the relay stream with a WebRTC one.
+
+Key source locations:
+- `libp2p/dist/src/registrar.js:275-278` — `topology.filter.has(peerId)` gate
+- `@chainsafe/libp2p-gossipsub/dist/src/index.js:475-480` — `streamsOutbound.has(id)` gate
+
+- **Fix:** Remove `runOnLimitedConnection: true` from the GossipSub config. With the default (`false`), the registrar skips limited connections *before* setting the filter, so WebRTC is the first connection GossipSub sees. Messages then flow directly over WebRTC, surviving relay shutdown.
+- **Tradeoff:** Messages don't flow until WebRTC establishes (a few seconds). If WebRTC fails (symmetric NAT), messages never flow — acceptable for P2P architecture.
+- **Discovered:** epic-008
 
 ### TypeScript type mismatch with `libp2p@3.x`
 

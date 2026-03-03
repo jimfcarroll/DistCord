@@ -14,11 +14,30 @@ import { keypairToLibp2pKey } from "./identity-bridge.js";
 
 // gossipsub 14.x bundles @libp2p/interface@2.x; libp2p 3.x uses @3.x.
 // Runtime compatible, but the types diverge. Cast through unknown.
+// runOnLimitedConnection intentionally omitted (defaults to false).
+// This forces GossipSub to ignore relay (limited) connections and only
+// bind to direct WebRTC connections.  The relay connects first; if
+// GossipSub binds to it, the registrar's topology filter blocks the
+// later WebRTC notification, so messages would flow through the relay
+// instead of the direct data channel.
 const pubsub = gossipsub({
   globalSignaturePolicy: "StrictNoSign",
   allowPublishToZeroTopicPeers: true,
-  runOnLimitedConnection: true,
 }) as unknown as ReturnType<typeof identify>;
+
+// libp2p's dial() has no default timeout — hangs forever on failure.
+// Wrap with a default so callers don't need to pass AbortSignal every time.
+export function wrapDialWithTimeout(
+  rawDial: (...args: any[]) => Promise<any>,
+  timeoutMs = 15_000,
+) {
+  return (peer: any, options?: any) => {
+    if (!options?.signal) {
+      return rawDial(peer, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+    }
+    return rawDial(peer, options);
+  };
+}
 
 export async function createBrowserNode(
   keypair: IdentityKeypair,
@@ -38,7 +57,22 @@ export async function createBrowserNode(
     addresses: {
       listen: listenAddrs,
     },
-    transports: [webRTC(), webSockets(), circuitRelayTransport()],
+    transports: [
+      webRTC({
+        rtcConfiguration: {
+          iceServers: [
+            {
+              urls: [
+                "stun:stun.l.google.com:19302",
+                "stun:stun1.l.google.com:19302",
+              ],
+            },
+          ],
+        },
+      }),
+      webSockets(),
+      circuitRelayTransport(),
+    ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     connectionGater: {
@@ -57,6 +91,9 @@ export async function createBrowserNode(
     },
     start: false,
   });
+
+  const rawDial = node.dial.bind(node);
+  (node as any).dial = wrapDialWithTimeout(rawDial);
 
   return node;
 }

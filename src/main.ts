@@ -8,10 +8,10 @@ import { CID } from "multiformats/cid";
 import { multiaddr } from "@multiformats/multiaddr";
 import type { Libp2p, PeerId, IdentifyResult } from "@libp2p/interface";
 
-const RELAY_HOST = import.meta.env.VITE_RELAY_HOST ?? "localhost";
+const RELAY_HOST = window.location.hostname;
+const RELAY_PORT = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
+const RELAY_WSS = window.location.protocol === "https:";
 const RELAY_WS_PORT = import.meta.env.VITE_RELAY_WS_PORT ?? "9001";
-const RELAY_WSS = import.meta.env.VITE_RELAY_WSS === "true";
-const PROXY_PORT = import.meta.env.VITE_PROXY_PORT ?? "8443";
 // Relative path — works through both Vite dev proxy and the TLS reverse proxy
 const RELAY_INFO_URL = "/relay-info";
 
@@ -95,7 +95,7 @@ async function main() {
     if (RELAY_WSS) {
       return a
         .replace(/\/ip4\/[^/]+\//, `/dns4/${RELAY_HOST}/`)
-        .replace(/\/tcp\/\d+\//, `/tcp/${PROXY_PORT}/`)
+        .replace(/\/tcp\/\d+\//, `/tcp/${RELAY_PORT}/`)
         .replace(/\/ws\//, "/wss/");
     }
     return a
@@ -264,26 +264,23 @@ async function main() {
         const pid = provider.id.toString();
         if (pid === node.peerId.toString()) continue;
 
-        // Prefer /webrtc multiaddrs for direct P2P connection.
-        // dial(peerId) tries /p2p-circuit first → limited relay connection.
-        // dial(webrtcAddr) triggers WebRTC signaling → direct data channel.
-        const webrtcAddrs = (provider.multiaddrs ?? []).filter((ma) =>
-          ma.toString().includes("/webrtc"),
-        );
-        log(`Found peer via DHT: ${short(pid)} (${webrtcAddrs.length} webrtc addrs)`);
+        log(`Found peer via DHT: ${short(pid)}`);
 
-        if (webrtcAddrs.length > 0) {
-          node.dial(webrtcAddrs[0]).catch((err: unknown) => {
-            log(`WebRTC dial failed, trying relay: ${err}`);
-            node.dial(provider.id).catch((err2: unknown) => {
-              log(`Relay dial ${short(pid)} also failed: ${err2}`);
-            });
+        // Construct /webrtc addr using OUR relay address, not the peer's.
+        // DHT provider records contain the peer's self-reported relay address
+        // (e.g. homer-prime:8443) which WAN browsers can't resolve.
+        // Using our own relay address works because it's the same relay server —
+        // just accessed through an address we can actually reach.
+        const webrtcAddr = multiaddr(
+          `${relayAddrs[0]}/p2p-circuit/webrtc/p2p/${pid}`,
+        );
+        log(`Dialing WebRTC: ${webrtcAddr.toString()}`);
+        node
+          .dial(webrtcAddr)
+          .then(() => log(`WebRTC dial to ${short(pid)} succeeded`))
+          .catch((err: unknown) => {
+            log(`WebRTC dial failed: ${err}`);
           });
-        } else {
-          node.dial(provider.id).catch((err: unknown) => {
-            log(`Dial ${short(pid)} failed: ${err}`);
-          });
-        }
       }
     } catch (err) {
       log(`DHT discovery failed: ${err}`);
