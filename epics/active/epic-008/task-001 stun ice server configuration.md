@@ -1,6 +1,6 @@
 # Task-001: STUN/ICE Server Configuration
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -26,7 +26,7 @@ No other files change. The relay and proxy are already WAN-ready.
 
 ## Acceptance Criteria
 
-- [ ] `webRTC()` configured with explicit STUN servers
-- [ ] `npm run build` passes
-- [ ] `npm test` passes
+- [x] `webRTC()` configured with explicit STUN servers
+- [x] `npm run build` passes
+- [x] `npm test` passes
 - [ ] LAN test: no regression — browsers still show `webrtc limited=false`

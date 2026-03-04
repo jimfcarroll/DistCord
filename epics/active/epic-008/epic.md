@@ -29,7 +29,7 @@ Epic-007 gave us LAN access via a TLS proxy and env-based relay addressing. Dire
 
 | # | Task | Status |
 |---|------|--------|
-| 001 | STUN/ICE server configuration | pending |
+| 001 | STUN/ICE server configuration | done |
 | 002 | WAN deployment and verification | pending |
 
 ## Milestone

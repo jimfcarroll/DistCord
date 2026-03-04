@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
       // Proxy relay info for localhost dev (LAN dev uses the TLS reverse proxy instead)
       proxy: {
         "/relay-info": {
-          target: `http://${env.VITE_RELAY_HOST || "localhost"}:${env.VITE_RELAY_INFO_PORT || "9002"}`,
+          target: `http://localhost:${env.VITE_RELAY_INFO_PORT || "9002"}`,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/relay-info/, "/"),
         },
