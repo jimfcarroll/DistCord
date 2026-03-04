@@ -9,3 +9,5 @@ relay-key.bin
 .env.local
 proxy/cert.pem
 proxy/key.pem
+/test-results/
+/playwright-report/
