@@ -538,18 +538,66 @@ In our case, the browsers were not upgrading to direct WebRTC connections (both 
 
 **Why no disconnect event:** The relay closes the specific relayed stream, not the WebSocket connection to the peer. From libp2p's perspective, the connection object still exists — only one logical stream died. There is no event for "one of your multiplexed streams was reset by the relay." GossipSub's outbound stream becomes a dead pipe that accepts writes but delivers nothing.
 
-**The fix:** Increase the relay's limits:
+**The fix (original):** We initially raised the relay's limits to 30 minutes / 128 MB so relayed connections would survive long enough for the data path. This was a workaround — the real fix was getting WebRTC direct connections working.
 
-```typescript
-relay: circuitRelayServer({
-  reservations: {
-    defaultDurationLimit: 30 * 60 * 1000,  // 30 minutes
-    defaultDataLimit: BigInt(1 << 27),      // 128 MB
-  },
-}),
+**Current state:** Reverted to the 2-minute default. Now that the hangUp-before-WebRTC pattern reliably upgrades all connections to direct WebRTC, the relay is only used for signaling (the brief SDP/ICE exchange that takes seconds). The 2-minute default is more than enough. For symmetric NAT peers that can't WebRTC, the relay is the only data path and it dies after 2 minutes — this is acceptable for now.
+
+### How GossipSub Messages Flow
+
+GossipSub doesn't broadcast. It maintains a **mesh** — a set of direct streams to peers subscribed to the same topic. Each message is individually written to each peer's stream. The "broadcast" is emergent from the mesh topology: each peer forwards to its neighbors.
+
+**Relay path** (when two browsers only have a circuit relay connection):
+
+```
+Browser A publishes "hello" to topic "room-xyz"
+  → GossipSub looks up mesh peers for "room-xyz": finds Browser B
+  → OutboundStream.push(data) → pushable buffer
+  → pipe(pushable, rawStream) writes into yamux stream #N
+  → yamux frames it, noise encrypts it
+  → bytes go out Browser A's WebSocket to the relay
+  → RELAY: receives bytes on Browser A's STOP stream
+  → RELAY: copies bytes to Browser B's STOP stream (dumb pipe)
+  → bytes arrive on Browser B's WebSocket from relay
+  → noise decrypts, yamux demuxes to stream #N
+  → GossipSub InboundStream reads "hello" → delivers to app
 ```
 
-Don't set to 0 (unlimited) on a public relay — bad actors could park connections forever and exhaust relay resources.
+**WebRTC path** (direct connection, relay not involved):
+
+```
+Browser A publishes "hello"
+  → GossipSub writes to OutboundStream for Browser B
+  → pushable → yamux → noise → SCTP data channel
+  → WebRTC → DTLS/UDP → internet → Browser B's WebRTC
+  → SCTP → noise → yamux → GossipSub InboundStream → app
+  → Relay is NOT involved. It could be offline.
+```
+
+**Silent death** (relay kills the stream after TTL expiry):
+
+```
+Browser A publishes "hello" after relay's 2-minute TTL expires
+  → GossipSub writes to OutboundStream for Browser B
+  → OutboundStream.push(data) → pushable buffer accepts it ✓
+  → pipe(pushable, rawStream) → rawStream.sink errors
+  → pipe rejects → .catch(errCallback)
+  → errCallback: (e) => { this.log.error('outbound pipe error', e) }
+  → this.log.error logs to libp2p debug logger → swallowed, invisible
+  → Browser A: no error event, GossipSub thinks write succeeded
+  → Browser B: never receives "hello"
+```
+
+### Making GossipSub Errors Visible
+
+**The problem:** GossipSub uses `this.log.error()` in 13 places — all inside `.catch()` or `catch` blocks. Every one of these is an error-swallowing pattern: the error is caught, logged to the internal debug channel, and discarded. No event is emitted, no callback is called, no way for application code to know something failed.
+
+The `errCallback` passed to `OutboundStream` is an inline anonymous function `(e) => { this.log.error('outbound pipe error', e) }` created inside a private method — it can't be intercepted directly.
+
+**The fix:** `wrapGossipSubErrors()` in `create-browser-node.ts` wraps `pubsub.log.error` — the common drain for all 13 error sites. It extracts the first argument as a prefix string and routes to our callback before passing through to the original logger. Same decoration principle as `wrapDialWithTimeout()`: observe the exchange, don't interfere.
+
+The callback dispatches on the prefix string (e.g., `"outbound pipe error"`, `"Cannot send rpc to <id>"`) to handle specific error types. Currently logs to the app UI; structured to extend with real error handling (peer removal, reconnect, etc.) later.
+
+**Version coupling:** The prefix strings are from `@chainsafe/libp2p-gossipsub` v14.x. On upgrade, verify each prefix still matches the source. The full prefix reference with source locations is in the `wrapGossipSubErrors()` JSDoc in `create-browser-node.ts`.
 
 ---
 
@@ -723,7 +771,7 @@ When a mobile device locks the screen or the browser moves to background, the OS
 3. Browser dials peer's `/webrtc` multiaddr — this uses the relay for SDP/ICE signaling only
 4. ICE negotiation runs: STUN discovers external addresses, both sides attempt hole punching
 5. **If cone NAT (common case):** Direct WebRTC data channel established. Relay is out of the data path. Connection shows `limited=false`.
-6. **If symmetric NAT:** ICE fails. No TURN configured. Connection attempt fails. The relay-mediated stream (used for signaling) stays alive as a fallback data path until its duration limit expires (30 minutes with our current config).
+6. **If symmetric NAT:** ICE fails. No TURN configured. Connection attempt fails. The relay-mediated stream (used for signaling) stays alive as a fallback data path until its duration limit expires (2 minutes, the libp2p default).
 
 The `Identify: ... webrtc limited=false` log line confirms a direct connection. `limited=true` means traffic is still going through the relay.
 

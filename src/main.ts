@@ -1,6 +1,6 @@
 import { generateKeypair, fingerprint } from "./identity/index.js";
 import type { IdentityKeypair } from "./identity/index.js";
-import { createBrowserNode } from "./network/index.js";
+import { createBrowserNode, wrapGossipSubErrors } from "./network/index.js";
 import { rewriteRelayAddr } from "./network/rewrite-relay-addr.js";
 import { computeRoomId, announceRoom, discoverRoom } from "./room/index.js";
 import { createRoomMessaging } from "./messaging/index.js";
@@ -105,6 +105,28 @@ async function main() {
   peerIdEl.textContent = short(node.peerId.toString());
   peerIdEl.title = node.peerId.toString();
   log(`PeerId: ${node.peerId.toString()}`);
+
+  // Intercept GossipSub errors that are silently swallowed into its debug logger.
+  // Dispatch on the prefix string — extend each case with real handling as needed.
+  // See wrapGossipSubErrors() JSDoc for full prefix reference.
+  wrapGossipSubErrors(node, (prefix, args) => {
+    if (prefix.startsWith("outbound pipe error")) {
+      log(`[GossipSub] Stream died: ${args[1]}`);
+      // Future: remove peer from mesh, trigger reconnect
+    } else if (prefix.startsWith("Cannot send rpc")) {
+      log(`[GossipSub] ${prefix}: ${args[1]}`);
+      // Future: mark peer unreachable, try alternate route
+    } else if (prefix.startsWith("createOutboundStream")) {
+      log(`[GossipSub] Stream creation failed: ${args[1]}`);
+      // Future: retry stream creation
+    } else if (prefix === "") {
+      // Error object only (stream close failures, inbound read errors)
+      log(`[GossipSub] ${args[0]}`);
+    } else {
+      // Catch-all for other prefixed errors (tagging, inflight queue, etc.)
+      log(`[GossipSub] ${args.map(String).join(" ")}`);
+    }
+  });
 
   // Disable room controls until relay is connected and DHT routing table populates
   createRoomBtn.disabled = true;

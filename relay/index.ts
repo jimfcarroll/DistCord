@@ -44,12 +44,7 @@ async function main() {
         clientMode: false,
         peerInfoMapper: passthroughMapper,
       }),
-      relay: circuitRelayServer({
-        reservations: {
-          defaultDurationLimit: 30 * 60 * 1000, // 30 min (default 2 min)
-          defaultDataLimit: BigInt(1 << 27), // 128 MB (default 128 KB)
-        },
-      }),
+      relay: circuitRelayServer(),
     },
   });
 

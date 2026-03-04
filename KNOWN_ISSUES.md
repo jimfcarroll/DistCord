@@ -47,8 +47,17 @@ The relay transports bytes between peers but does not perform peer discovery, pr
 
 The defaults are buried in `@libp2p/circuit-relay-v2/dist/src/constants.js` and not mentioned in the README or API docs. The 2-minute default is designed for short-lived relay-assisted signaling (establish WebRTC, then disconnect from relay), not for sustained communication.
 
-- **Fix:** Configure explicit limits: `circuitRelayServer({ reservations: { defaultDurationLimit: 30 * 60 * 1000, defaultDataLimit: BigInt(1 << 27) } })`. Do not set to 0 (unlimited) on a public relay — bad actors could park connections forever.
-- **Discovered:** epic-004 debugging
+- **Current state:** Using the 2-min default. Now that the hangUp-before-WebRTC pattern upgrades all connections to direct WebRTC, the relay is only used for signaling. The 2-min default is sufficient. GossipSub's silent error swallowing is intercepted by `wrapGossipSubErrors()` — see below.
+- **Discovered:** epic-004 debugging, updated epic-008
+
+### GossipSub silently swallows all errors into its debug logger
+
+**Errors from stream death, RPC send failures, stream creation — all invisible to application code.**
+GossipSub uses `this.log.error()` in 13 places inside `.catch()` or `catch` blocks. These errors are caught, logged to libp2p's internal debug channel (`localStorage.debug = 'libp2p:gossipsub*'`), and discarded. No event is emitted, no callback is called.
+
+- **Fix:** `wrapGossipSubErrors()` in `create-browser-node.ts` wraps `pubsub.log.error` to intercept all 13 error sites. Extracts the prefix string and dispatches to our callback. Passes through to the original logger unchanged. See the JSDoc for the full prefix reference with source locations.
+- **Version coupling:** Prefix strings are from `@chainsafe/libp2p-gossipsub` v14.x. Must re-verify on upgrade.
+- **Discovered:** epic-008
 
 ### Circuit relay reservation timeout is 2 seconds by default
 

@@ -1,6 +1,6 @@
 # Task-002: WAN Deployment and Verification
 
-**Status:** pending
+**Status:** done
 
 ## Objective
 
@@ -33,7 +33,7 @@ The cleanest true WAN test — two genuinely different networks, no shared LAN s
 ### Interpreting Results
 
 - **`webrtc limited=false` on both + messages flow** — NAT traversal working. Done.
-- **`limited=true`** — hole-punching failed. Carrier likely uses symmetric NAT (common on 4G/5G). Messages still work but route through the relay, so they'll stop after 30 minutes.
+- **`limited=true`** — hole-punching failed. Carrier likely uses symmetric NAT (common on 4G/5G). Messages still work but route through the relay, so they'll stop after 2 minutes (the default relay reservation TTL).
 - **Phone can't reach the URL** — port forward misconfigured, or carrier blocks the port. Try forwarding port 443 instead (rarely blocked).
 - **Phone rejects SSL cert** — some mobile browsers don't allow self-signed cert bypass. Use Chrome on Android (it allows it).
 
@@ -48,8 +48,8 @@ The phone test is more reliable because there is no shared LAN.
 
 ## Acceptance Criteria
 
-- [ ] Relay reachable from external network (browser on different public IP can connect)
-- [ ] DHT discovery works across networks (peer found via `findProviders`)
-- [ ] Direct WebRTC connection established (`webrtc limited=false` in logs)
-- [ ] Messages flow between browsers on different networks
-- [ ] Messages survive past relay's 30-minute timeout (confirming relay is not in data path)
+- [x] Relay reachable from external network (browser on different public IP can connect)
+- [x] DHT discovery works across networks (peer found via `findProviders`)
+- [x] Direct WebRTC connection established (`webrtc limited=false` in logs)
+- [x] Messages flow between browsers on different networks
+- [x] Messages survive relay shutdown (relay killed entirely — stronger than timeout test)

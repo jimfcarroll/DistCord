@@ -1,6 +1,6 @@
 # Epic-008: WAN Deployment & NAT Traversal
 
-**Status:** active
+**Status:** done
 
 ## Overview
 
@@ -30,8 +30,8 @@ Epic-007 gave us LAN access via a TLS proxy and env-based relay addressing. Dire
 | # | Task | Status |
 |---|------|--------|
 | 001 | STUN/ICE server configuration | done |
-| 002 | WAN deployment and verification | pending |
+| 002 | WAN deployment and verification | done |
 
 ## Milestone
 
-Two browsers on different networks (different public IPs) join a room, exchange messages over direct WebRTC connections (`webrtc limited=false`), and messages survive past the relay's 30-minute timeout.
+Two browsers on different networks (different public IPs) join a room, exchange messages over direct WebRTC connections (`webrtc limited=false`), and messages survive relay shutdown (confirmed — relay killed entirely, messages continued over direct WebRTC).

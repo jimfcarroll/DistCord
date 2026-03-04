@@ -29,4 +29,4 @@ No other files change. The relay and proxy are already WAN-ready.
 - [x] `webRTC()` configured with explicit STUN servers
 - [x] `npm run build` passes
 - [x] `npm test` passes
-- [ ] LAN test: no regression — browsers still show `webrtc limited=false`
+- [x] LAN test: no regression — browsers still show `webrtc limited=false`
